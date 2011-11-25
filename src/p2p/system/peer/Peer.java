@@ -80,7 +80,7 @@ public final class Peer extends ComponentDefinition {
 	private static int STABILIZING_PERIOD = 1000;
 	private PeerAddress pred;
 	private PeerAddress succ;
-	private PeerAddress[] longlinks = new PeerAddress[LONGLINK_SIZE + FRIENDLINK_SIZE ];
+	private PeerAddress[] longlinks = new PeerAddress[LONGLINK_SIZE + FRIENDLINK_SIZE];
 	//private PeerAddress[] friendlinks = new PeerAddress[FRIENDLINK_SIZE];
 	private PeerAddress[] succList = new PeerAddress[SUCC_SIZE];
 	int count = 0;
@@ -90,7 +90,6 @@ public final class Peer extends ComponentDefinition {
 	private int joinCounter = 0;
 	private int replicateCounter = 0;
 	private boolean started = false;
-	private int similarityIndex= 0;
 	private int[] linkSimilarityIndex = new int[FRIENDLINK_SIZE];
 	
 	
@@ -146,7 +145,7 @@ public final class Peer extends ComponentDefinition {
 			this.longlinks[i] = null;
 		
 		for (int i = 0; i < FRIENDLINK_SIZE; i++)
-			this.linkSimilarityIndex[i] = 0;
+			this.linkSimilarityIndex[i] = -1;
 
 		// =========================
 		fdRequests = new HashMap<Address, UUID>();
@@ -377,7 +376,6 @@ public final class Peer extends ComponentDefinition {
 		public void handle(SubscriptionExchangeRequest event) {
 			BigInteger id = event.getID();
 			PeerAddress initiator = event.getInitiator();
-			int friendIndex = event.getFriendIndex();
 			Set<BigInteger> subscriptionList = new HashSet<BigInteger>();
 			
 			if (succ != null
@@ -387,12 +385,11 @@ public final class Peer extends ComponentDefinition {
 				subscriptionList= mySubscriptions.keySet();
 				
 				trigger(new SubscriptionExchangeReply(myPeerAddress, initiator, succ,
-						friendIndex, subscriptionList), network);
+						subscriptionList), network);
 			}
 			else {
 				PeerAddress nextPeer = closestPrecedingNode(id);
-				trigger(new SubscriptionExchangeRequest(myPeerAddress, nextPeer, initiator, id,
-						friendIndex), network);
+				trigger(new SubscriptionExchangeRequest(myPeerAddress, nextPeer, initiator, id), network);
 			}
 		}
 	};
@@ -401,72 +398,48 @@ public final class Peer extends ComponentDefinition {
 	Handler<SubscriptionExchangeReply> handleSubscriptionExchangeReply = new Handler<SubscriptionExchangeReply>() {
 		public void handle(SubscriptionExchangeReply event) {
 			PeerAddress responsible = event.getResponsible();
-			int friendlinkIndex = event.getFriendIndex();
 			Set<BigInteger> friendSubscriptions = event.getSubscriptionList();
 	
-			addFriendLink(responsible, friendlinkIndex, friendSubscriptions);
+			addFriendLink(responsible, friendSubscriptions);
+			// TODO: modify Snapshot
 		//	Snapshot.setLonglinks(myPeerAddress, new HashSet<PeerAddress>(Arrays.asList(longlinks)));
 
 		}
 	};
 	
-	private void addFriendLink(PeerAddress peer, int index, Set<BigInteger> set) {
-	
-		Set<BigInteger> friendSubscriptions = new HashSet<BigInteger>();
-		friendSubscriptions = set;
+	private void addFriendLink(PeerAddress peer, Set<BigInteger> friendSubscriptions) {
+		int min=0;
+		boolean end = false;
 		
-			// check if peer exists
-		/* boolean exists = false;
-			for (int i = 0; i < friendlinks.length; i++) {
-				if (friendlinks[i] != null && 
-						(friendlinks[i].equals(peer) || peer.equals(myPeerAddress))) {
-					exists = true;
-					break;
-				}
+		int friendSimilarityIndex = 0;
+		Iterator<BigInteger> itr  = friendSubscriptions.iterator();
+		while(itr.hasNext()){
+			if(mySubscriptions.containsKey(itr.next()))
+				friendSimilarityIndex++;
+		}
+		
+		//finding the index with minimum value
+		int smallestValueSoFar = Integer.MAX_VALUE;
+		int index = -1;
+		for(int j=0; j < linkSimilarityIndex.length; j++){
+			if (linkSimilarityIndex[j] < smallestValueSoFar) {
+				smallestValueSoFar = linkSimilarityIndex[j];
+				index = j;
 			}
+		}
+		
+		// prefer the higher similarity index
+		if(friendSimilarityIndex > linkSimilarityIndex[index]){
+							
+			System.err.println("Similarity Index of source peer " + myPeerAddress.getPeerId() + " with random peer " + peer.getPeerId() + " is: "+ friendSimilarityIndex);
+			longlinks[index + LONGLINK_SIZE] = new PeerAddress(peer);
+			linkSimilarityIndex[index] =  friendSimilarityIndex;
 			
-			if (exists) {
-				//System.err.println("Peer " + myPeerAddress.getPeerId() + " rejected the longlink " + peer.getPeerId());
-				return;
-			}*/
-			 
-				
-				Iterator<BigInteger> itr  = friendSubscriptions.iterator();
+			// we decided to periodically refine one friend at a time so that we can get a better and better similarity index
 			
-				int min=0;
-				boolean end = false;
-				for(int i=0; i<friendSubscriptions.size(); i++){
-				if(mySubscriptions.containsKey(itr.next()))
-					similarityIndex++;
-				}
-				
-				//finding the index with minimum value
-				for(int j=0; j<linkSimilarityIndex.length; j++){
-					for(int k=j+1; k<linkSimilarityIndex.length; k++){
-					if(linkSimilarityIndex[j]<=linkSimilarityIndex[k]){
-						min = j;
-					}
-					else{
-						min = k;
-						break;
-					}
-					
-					if(k==linkSimilarityIndex.length-1)
-						end = true;
-				}
-					if (end)
-						break;
-				}
-				
-				if(similarityIndex>linkSimilarityIndex[min]){
-								
-				System.err.println("Similarity Index of source peer " + myPeerAddress.getPeerId() + " with random peer " + peer.getPeerId() + " is: "+ similarityIndex);
-				longlinks[min+LONGLINK_SIZE] = new PeerAddress(peer);
-				linkSimilarityIndex[min] =  similarityIndex;
-				
-				//fdRegister(longlinks[index]);
-				}
-				similarityIndex = 0;
+			//fdRegister(longlinks[index + LONGLINK_SIZE]);
+		}
+		friendSimilarityIndex = 0;
 	}
 	
 	
@@ -543,13 +516,14 @@ public final class Peer extends ComponentDefinition {
 			// fix one longlink at a time
 			
 			longlinkIndex++;
-			friendlinkIndex++;
+			//friendlinkIndex++;
 			if (longlinkIndex == LONGLINK_SIZE)
 				longlinkIndex = 1;
 			
+			/*
 			if (friendlinkIndex == FRIENDLINK_SIZE)
 				friendlinkIndex = 1;
-					
+			*/	
 			/*
 			System.out.println("Peer " + myPeerAddress.getPeerId() + ", longlinks: " + Arrays.toString(longlinks) 
 					+ ", pred: " + pred + ", succ: " + succ);
@@ -579,17 +553,16 @@ public final class Peer extends ComponentDefinition {
 
 	private void findNewFriendlink() {
 
-		Random rand = new Random();
-		//BigInteger(int numBits, Random rnd) 
-		//Constructs a randomly generated BigInteger, 
-		//uniformly distributed over the range 0 to (2^numBits - 1), inclusive.
-		BigInteger id = new BigInteger(SUCC_SIZE, rand);
+		//Random rand = new Random();
+		
+		// new BigInteger(int numBits, Random rnd) 
+		// Constructs a randomly generated BigInteger, 
+		// uniformly distributed over the range 0 to (2^numBits - 1), inclusive.
+		BigInteger id = new BigInteger(SUCC_SIZE, this.rand);
 
-			//System.err.println("Peer " + myPeerAddress.getPeerId() + " is proposing a longlink, estimated ID:" + id);
 			
-			PeerAddress nextPeer = closestPrecedingNode(id);
-			trigger(new SubscriptionExchangeRequest(myPeerAddress, nextPeer, myPeerAddress,
-					id, friendlinkIndex), network);
+		PeerAddress nextPeer = closestPrecedingNode(id);
+		trigger(new SubscriptionExchangeRequest(myPeerAddress, nextPeer, myPeerAddress, id), network);
 		
 	}
 	// -------------------------------------------------------------------

@@ -20,13 +20,11 @@ public class SubscriptionExchangeRequest extends PeerMessage{
 	private static final long serialVersionUID = -9199390927629685995L;
 	private final PeerAddress initiator;
 	private final BigInteger id;
-	private int friendIndex;
 	
-	public SubscriptionExchangeRequest(PeerAddress source, PeerAddress destination, PeerAddress initiator, BigInteger id, int friendIndex){		
+	public SubscriptionExchangeRequest(PeerAddress source, PeerAddress destination, PeerAddress initiator, BigInteger id){		
 		super(source, destination);
 		this.initiator = initiator;
 		this.id = id;
-		this.friendIndex = friendIndex;
 		
 	}
 
@@ -40,10 +38,6 @@ public class SubscriptionExchangeRequest extends PeerMessage{
 			return this.id;
 		}
 
-	//-------------------------------------------------------------------	
-		public int getFriendIndex() {
-			return this.friendIndex;
-		}
 	}
 
 
