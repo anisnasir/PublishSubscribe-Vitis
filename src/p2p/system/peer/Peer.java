@@ -408,9 +408,6 @@ public final class Peer extends ComponentDefinition {
 	};
 	
 	private void addFriendLink(PeerAddress peer, Set<BigInteger> friendSubscriptions) {
-		int min=0;
-		boolean end = false;
-		
 		int friendSimilarityIndex = 0;
 		Iterator<BigInteger> itr  = friendSubscriptions.iterator();
 		while(itr.hasNext()){
