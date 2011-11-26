@@ -72,16 +72,19 @@ public final class Peer extends ComponentDefinition {
 			.pow(Configuration.Log2Ring);
 	public static int LONGLINK_SIZE = Scenario1.NUMBER_OF_LONGLINKS;
 	public static int SUCC_SIZE = Configuration.Log2Ring; // WOW! a peer has
-	public static int FRIENDLINK_SIZE = 3;								// backup succ as
-															// much as the
-															// finger size??
+	public static int FRIENDLINK_SIZE = Scenario1.NUMBER_OF_FRIENDLINKS; // backup
+																			// succ
+																			// as
+	// much as the
+	// finger size??
 	private static int WAIT_TIME_TO_REJOIN = 15;
 	private static int WAIT_TIME_TO_REPLICATE = 3;
 	private static int STABILIZING_PERIOD = 1000;
 	private PeerAddress pred;
 	private PeerAddress succ;
-	private PeerAddress[] longlinks = new PeerAddress[LONGLINK_SIZE + FRIENDLINK_SIZE];
-	//private PeerAddress[] friendlinks = new PeerAddress[FRIENDLINK_SIZE];
+	private PeerAddress[] longlinks = new PeerAddress[LONGLINK_SIZE
+			+ FRIENDLINK_SIZE];
+	// private PeerAddress[] friendlinks = new PeerAddress[FRIENDLINK_SIZE];
 	private PeerAddress[] succList = new PeerAddress[SUCC_SIZE];
 	int count = 0;
 
@@ -91,8 +94,7 @@ public final class Peer extends ComponentDefinition {
 	private int replicateCounter = 0;
 	private boolean started = false;
 	private int[] linkSimilarityIndex = new int[FRIENDLINK_SIZE];
-	
-	
+
 	private int networkSize;
 
 	// ======================
@@ -131,7 +133,7 @@ public final class Peer extends ComponentDefinition {
 																	// (your
 	private HashMap<BigInteger, Set<Address>> predForwardingTable;
 	private BigInteger publicationSeqNum;
-	
+
 	private LongLink longlinkhelper;
 
 	// -------------------------------------------------------------------
@@ -143,9 +145,9 @@ public final class Peer extends ComponentDefinition {
 
 		for (int i = 0; i < LONGLINK_SIZE; i++)
 			this.longlinks[i] = null;
-		
+
 		for (int i = 0; i < FRIENDLINK_SIZE; i++)
-			this.linkSimilarityIndex[i] = -1;
+			this.linkSimilarityIndex[i] = 0;
 
 		// =========================
 		fdRequests = new HashMap<Address, UUID>();
@@ -160,8 +162,6 @@ public final class Peer extends ComponentDefinition {
 		bootstrap = create(BootstrapClient.class);
 
 		publicationSeqNum = BigInteger.ONE;
-		
-		
 
 		connect(network, fd.getNegative(Network.class));
 		connect(network, bootstrap.getNegative(Network.class));
@@ -215,14 +215,15 @@ public final class Peer extends ComponentDefinition {
 			serverPeerAddress = null; // init.getServerPeerAddress();
 			serverAddress = null;// serverPeerAddress.getPeerAddress(); //TODO:
 									// remove server
-			friends = new Vector<PeerAddress>(); //TODO: remove this
+			friends = new Vector<PeerAddress>(); // TODO: remove this
 			msgPeriod = init.getMSConfiguration().getSnapshotPeriod();
 
 			viewSize = init.getMSConfiguration().getViewSize();
-			
+
 			networkSize = init.getNetworkSize();
-				
-			longlinkhelper = new LongLink(myPeerAddress, LONGLINK_SIZE, (int) RING_SIZE.longValue(), networkSize);
+
+			longlinkhelper = new LongLink(myPeerAddress, LONGLINK_SIZE,
+					(int) RING_SIZE.longValue(), networkSize);
 
 			trigger(new BootstrapClientInit(myAddress,
 					init.getBootstrapConfiguration()), bootstrap.getControl());
@@ -292,12 +293,12 @@ public final class Peer extends ComponentDefinition {
 				if (somePeers.size() == 0) {
 					pred = null;
 					succ = myPeerAddress;
-					
+
 					succList[0] = succ;
 					Snapshot.setPred(myPeerAddress, pred);
 					Snapshot.setSucc(myPeerAddress, succ);
 					longlinkhelper.updatePreSucc(pred, succ);
-					
+
 					joinCounter = -1;
 					trigger(new BootstrapCompleted("chord", myPeerAddress),
 							bootstrap.getPositive(P2pBootstrap.class));
@@ -347,7 +348,7 @@ public final class Peer extends ComponentDefinition {
 			}
 		}
 	};
-	
+
 	// -------------------------------------------------------------------
 	Handler<FindSuccReply> handleFindSuccReply = new Handler<FindSuccReply>() {
 		public void handle(FindSuccReply event) {
@@ -365,110 +366,153 @@ public final class Peer extends ComponentDefinition {
 				joinCounter = -1;
 			}
 
-			//longlinks[longlinkIndex] = new PeerAddress(responsible);
+			// longlinks[longlinkIndex] = new PeerAddress(responsible);
 			addLongLink(responsible, longlinkIndex);
-			Snapshot.setLonglinks(myPeerAddress, new HashSet<PeerAddress>(Arrays.asList(longlinks)));
+			Snapshot.setLonglinks(myPeerAddress, new HashSet<PeerAddress>(
+					Arrays.asList(longlinks).subList(0, LONGLINK_SIZE)));
+
 		}
 	};
-	
-	
+
 	Handler<SubscriptionExchangeRequest> handleSubscriptionExchangeRequest = new Handler<SubscriptionExchangeRequest>() {
 		public void handle(SubscriptionExchangeRequest event) {
 			BigInteger id = event.getID();
 			PeerAddress initiator = event.getInitiator();
 			Set<BigInteger> subscriptionList = new HashSet<BigInteger>();
-			
+
 			if (succ != null
 					&& RingKey.belongsTo(id, myPeerAddress.getPeerId(),
 							succ.getPeerId(),
-							RingKey.IntervalBounds.OPEN_CLOSED, RING_SIZE)){
-				subscriptionList= mySubscriptions.keySet();
-				
-				trigger(new SubscriptionExchangeReply(myPeerAddress, initiator, succ,
-						subscriptionList), network);
-			}
-			else {
+							RingKey.IntervalBounds.OPEN_CLOSED, RING_SIZE)) {
+				subscriptionList = mySubscriptions.keySet();
+
+				trigger(new SubscriptionExchangeReply(myPeerAddress, initiator,
+						succ, subscriptionList), network);
+			} else {
 				PeerAddress nextPeer = closestPrecedingNode(id);
-				trigger(new SubscriptionExchangeRequest(myPeerAddress, nextPeer, initiator, id), network);
+				trigger(new SubscriptionExchangeRequest(myPeerAddress,
+						nextPeer, initiator, id), network);
 			}
 		}
 	};
-	
-	
+
 	Handler<SubscriptionExchangeReply> handleSubscriptionExchangeReply = new Handler<SubscriptionExchangeReply>() {
 		public void handle(SubscriptionExchangeReply event) {
 			PeerAddress responsible = event.getResponsible();
 			Set<BigInteger> friendSubscriptions = event.getSubscriptionList();
-	
+
 			addFriendLink(responsible, friendSubscriptions);
 			// TODO: modify Snapshot
-		//	Snapshot.setLonglinks(myPeerAddress, new HashSet<PeerAddress>(Arrays.asList(longlinks)));
+			// Snapshot.setLonglinks(myPeerAddress, new
+			// HashSet<PeerAddress>(Arrays.asList(longlinks)));
+			Snapshot.setFriendlinks(
+					myPeerAddress,
+					new HashSet<PeerAddress>(Arrays.asList(longlinks).subList(
+							LONGLINK_SIZE, LONGLINK_SIZE + FRIENDLINK_SIZE)));
 
 		}
 	};
 	
-	private void addFriendLink(PeerAddress peer, Set<BigInteger> friendSubscriptions) {
+	private int computeSimilarityIndex(Set<BigInteger> friendSubscriptions) {
 		int friendSimilarityIndex = 0;
-		Iterator<BigInteger> itr  = friendSubscriptions.iterator();
-		while(itr.hasNext()){
-			if(mySubscriptions.containsKey(itr.next()))
+		Iterator<BigInteger> itr = friendSubscriptions.iterator();
+		while (itr.hasNext()) {
+			if (mySubscriptions.containsKey(itr.next()))
 				friendSimilarityIndex++;
 		}
 		
-		//finding the index with minimum value
-		int smallestValueSoFar = Integer.MAX_VALUE;
-		int index = -1;
-		for(int j=0; j < linkSimilarityIndex.length; j++){
-			if (linkSimilarityIndex[j] < smallestValueSoFar) {
-				smallestValueSoFar = linkSimilarityIndex[j];
-				index = j;
+		return friendSimilarityIndex;
+	}
+
+	private int numOfMyFriendlinks = 0;
+	
+	private void addFriendLink(PeerAddress peer, Set<BigInteger> friendSubscriptions) {
+		int friendSimilarityIndex = 0;
+		
+		int j;
+		for (j = 0; j < LONGLINK_SIZE; j++) {
+			if (longlinks[j] != null && longlinks[j].equals(peer))
+				return;
+		}
+		
+		for (;j < longlinks.length; j++) {
+			if (longlinks[j] != null && longlinks[j].equals(peer)) {
+				linkSimilarityIndex[j - LONGLINK_SIZE] = computeSimilarityIndex(friendSubscriptions);
+				return;
 			}
 		}
 		
+		// if I still have empty slot in friendlink, just adopt the peer without any checking
+		if (numOfMyFriendlinks < FRIENDLINK_SIZE) {
+			linkSimilarityIndex[numOfMyFriendlinks] = computeSimilarityIndex(friendSubscriptions);
+			longlinks[LONGLINK_SIZE + numOfMyFriendlinks] = new PeerAddress(peer);
+			numOfMyFriendlinks++;
+			return;
+		}
+		
+		friendSimilarityIndex = computeSimilarityIndex(friendSubscriptions);
+
+		// finding the index with minimum value
+		int smallestValueSoFar = Integer.MAX_VALUE;
+		int index = -1;
+		for (int i = 0; i < linkSimilarityIndex.length; i++) {
+			if (linkSimilarityIndex[i] < smallestValueSoFar) {
+				smallestValueSoFar = linkSimilarityIndex[i];
+				index = i;
+			}
+		}
+		
+		
 		// prefer the higher similarity index
-		if(friendSimilarityIndex > linkSimilarityIndex[index]){
-							
-			System.err.println("Similarity Index of source peer " + myPeerAddress.getPeerId() + " with random peer " + peer.getPeerId() + " is: "+ friendSimilarityIndex);
+		if (friendSimilarityIndex > linkSimilarityIndex[index]) {
+
+			System.err.println("Similarity Index of source peer "
+					+ myPeerAddress.getPeerId() + " with random peer "
+					+ peer.getPeerId() + " is: " + friendSimilarityIndex);
+			
 			longlinks[index + LONGLINK_SIZE] = new PeerAddress(peer);
-			linkSimilarityIndex[index] =  friendSimilarityIndex;
-			
-			// we decided to periodically refine one friend at a time so that we can get a better and better similarity index
-			
-			//fdRegister(longlinks[index + LONGLINK_SIZE]);
+			linkSimilarityIndex[index] = friendSimilarityIndex;
+			//System.out.println(longlinks[index + LONGLINK_SIZE]);
+			// we decided to periodically refine one friend at a time so that we
+			// can get a better and better similarity index
+
+			// fdRegister(longlinks[index + LONGLINK_SIZE]);
+		} else {
+			//System.out.println(" rejected");
 		}
 		friendSimilarityIndex = 0;
 	}
-	
-	
+
 	private void addLongLink(PeerAddress peer, int index) {
 		if (index == 0) {
 			longlinks[index] = new PeerAddress(peer);
 			fdRegister(longlinks[index]);
 		}
-		
+
 		else {
 			// check if peer exists
 			boolean exists = false;
 			for (int i = 0; i < longlinks.length; i++) {
-				if (longlinks[i] != null && 
-						(longlinks[i].equals(peer) || peer.equals(myPeerAddress))) {
+				if (longlinks[i] != null
+						&& (longlinks[i].equals(peer) || peer
+								.equals(myPeerAddress))) {
 					exists = true;
 					break;
 				}
 			}
-			
+
 			if (exists) {
-				//System.err.println("Peer " + myPeerAddress.getPeerId() + " rejected the longlink " + peer.getPeerId());
+				// System.err.println("Peer " + myPeerAddress.getPeerId() +
+				// " rejected the longlink " + peer.getPeerId());
 				return;
-			}
-			else {
+			} else {
 				longlinks[index] = new PeerAddress(peer);
 				fdRegister(longlinks[index]);
 			}
 		}
-			
+
 	}
-	
+
 	private void removeLonglink(PeerAddress peer) {
 		// check if peer exists
 		int exists = -1;
@@ -478,12 +522,12 @@ public final class Peer extends ComponentDefinition {
 				break;
 			}
 		}
-		
+
 		if (exists == -1)
 			System.err.println("Trying to remove invalid peer");
 		else
 			longlinks[exists] = null;
-			
+
 	}
 
 	// -------------------------------------------------------------------
@@ -511,57 +555,60 @@ public final class Peer extends ComponentDefinition {
 				return;
 
 			// fix one longlink at a time
-			
+
 			longlinkIndex++;
-			//friendlinkIndex++;
+			// friendlinkIndex++;
 			if (longlinkIndex == LONGLINK_SIZE)
 				longlinkIndex = 1;
-			
+
 			/*
-			if (friendlinkIndex == FRIENDLINK_SIZE)
-				friendlinkIndex = 1;
-			*/	
+			 * if (friendlinkIndex == FRIENDLINK_SIZE) friendlinkIndex = 1;
+			 */
 			/*
-			System.out.println("Peer " + myPeerAddress.getPeerId() + ", longlinks: " + Arrays.toString(longlinks) 
-					+ ", pred: " + pred + ", succ: " + succ);
-			//*/
-			
+			 * System.out.println("Peer " + myPeerAddress.getPeerId() +
+			 * ", longlinks: " + Arrays.toString(longlinks) + ", pred: " + pred
+			 * + ", succ: " + succ); //
+			 */
+
 			if (longlinks[longlinkIndex] == null) {
-				//System.err.println("Peer " + myPeerAddress.getPeerId() + " is proposing a long link");				
+				// System.err.println("Peer " + myPeerAddress.getPeerId() +
+				// " is proposing a long link");
 				proposeNewLonglink();
 			}
-				
+
 			findNewFriendlink();
 		}
 	};
-	
+
 	private void proposeNewLonglink() {
 		int index = longlinkhelper.obtainNewLongLinkID();
-		
+
 		if (index != -1) {
 			BigInteger id = BigInteger.valueOf(index);
-			//System.err.println("Peer " + myPeerAddress.getPeerId() + " is proposing a longlink, estimated ID:" + id);
-			
+			// System.err.println("Peer " + myPeerAddress.getPeerId() +
+			// " is proposing a longlink, estimated ID:" + id);
+
 			PeerAddress nextPeer = closestPrecedingNode(id);
-			trigger(new FindSucc(myPeerAddress, nextPeer, myPeerAddress,
-					id, longlinkIndex), network);
+			trigger(new FindSucc(myPeerAddress, nextPeer, myPeerAddress, id,
+					longlinkIndex), network);
 		}
 	}
 
 	private void findNewFriendlink() {
 
-		//Random rand = new Random();
-		
-		// new BigInteger(int numBits, Random rnd) 
-		// Constructs a randomly generated BigInteger, 
+		// Random rand = new Random();
+
+		// new BigInteger(int numBits, Random rnd)
+		// Constructs a randomly generated BigInteger,
 		// uniformly distributed over the range 0 to (2^numBits - 1), inclusive.
 		BigInteger id = new BigInteger(SUCC_SIZE, this.rand);
 
-			
 		PeerAddress nextPeer = closestPrecedingNode(id);
-		trigger(new SubscriptionExchangeRequest(myPeerAddress, nextPeer, myPeerAddress, id), network);
-		
+		trigger(new SubscriptionExchangeRequest(myPeerAddress, nextPeer,
+				myPeerAddress, id), network);
+
 	}
+
 	// -------------------------------------------------------------------
 	Handler<WhoIsPred> handleWhoIsPred = new Handler<WhoIsPred>() {
 		public void handle(WhoIsPred event) {
@@ -589,8 +636,10 @@ public final class Peer extends ComponentDefinition {
 					succList[0] = succ;
 					Snapshot.setSucc(myPeerAddress, succ);
 					longlinkhelper.updatePreSucc(pred, succ);
-					
-					Snapshot.setLonglinks(myPeerAddress, new HashSet<PeerAddress>(Arrays.asList(longlinks)));
+
+					Snapshot.setLonglinks(myPeerAddress,
+							new HashSet<PeerAddress>(Arrays.asList(longlinks)
+									.subList(0, LONGLINK_SIZE)));
 					fdRegister(succ);
 					joinCounter = -1;
 				}
@@ -641,7 +690,7 @@ public final class Peer extends ComponentDefinition {
 
 				PeerAddress suspectedPeer = fdPeers.get(suspectedPeerAddress);
 				fdUnregister(suspectedPeer);
-				
+
 				// CASE #1: my pred failed
 				if (suspectedPeer.equals(pred)) {
 					pred = null;
@@ -649,60 +698,51 @@ public final class Peer extends ComponentDefinition {
 					// Therefore merge my forwarding table with pred forwarding
 					// table
 					/*
-					System.out
-							.println("-------------- MY TABLE ----------------");
-					Set<BigInteger> keys = myForwardingTable.keySet();
-					Iterator<BigInteger> it = keys.iterator();
-					for (int j = 0; j < keys.size(); j++) {
-						BigInteger o = it.next();
-						System.out.println("Key: " + o + ", set: "
-								+ myForwardingTable.get(o));
-					}
-
-					keys = predForwardingTable.keySet();
-					it = keys.iterator();
-
-					System.out
-							.println("-------------- PRED TABLE ----------------");
-					for (int j = 0; j < keys.size(); j++) {
-						BigInteger o = it.next();
-						System.out.println("Key: " + o + ", set: "
-								+ predForwardingTable.get(o));
-					}
-
-					keys = predForwardingTable.keySet();
-					it = keys.iterator();
-			
-					for (int j = 0; j < keys.size(); j++) {
-						BigInteger index = it.next();
-				
-						Set<Address> values = new HashSet<Address>();
-
-						if (myForwardingTable.containsKey(index)) {
-							values = myForwardingTable.get(index);
-							values.addAll(predForwardingTable.get(index));
-							myForwardingTable.put(index, values);
-						} else {
-							myForwardingTable.put(index,
-									predForwardingTable.get(index));
-						}
-					}
-					// myForwardingTable.putAll(predForwardingTable); 
-					//doesn't work. replaces the value in my table if the same key exists in pred table
-
-					keys = myForwardingTable.keySet();
-					it = keys.iterator();
-					System.out
-							.println("-------------- MERGED TABLE ----------------");
-					for (int j = 0; j < keys.size(); j++) {
-						BigInteger o = it.next();
-						System.out.println("Key: " + o + ", set: "
-								+ myForwardingTable.get(o));
-					}
-					// maybe predForwardingTable.clear();
+					 * System.out
+					 * .println("-------------- MY TABLE ----------------");
+					 * Set<BigInteger> keys = myForwardingTable.keySet();
+					 * Iterator<BigInteger> it = keys.iterator(); for (int j =
+					 * 0; j < keys.size(); j++) { BigInteger o = it.next();
+					 * System.out.println("Key: " + o + ", set: " +
+					 * myForwardingTable.get(o)); }
+					 * 
+					 * keys = predForwardingTable.keySet(); it =
+					 * keys.iterator();
+					 * 
+					 * System.out
+					 * .println("-------------- PRED TABLE ----------------");
+					 * for (int j = 0; j < keys.size(); j++) { BigInteger o =
+					 * it.next(); System.out.println("Key: " + o + ", set: " +
+					 * predForwardingTable.get(o)); }
+					 * 
+					 * keys = predForwardingTable.keySet(); it =
+					 * keys.iterator();
+					 * 
+					 * for (int j = 0; j < keys.size(); j++) { BigInteger index
+					 * = it.next();
+					 * 
+					 * Set<Address> values = new HashSet<Address>();
+					 * 
+					 * if (myForwardingTable.containsKey(index)) { values =
+					 * myForwardingTable.get(index);
+					 * values.addAll(predForwardingTable.get(index));
+					 * myForwardingTable.put(index, values); } else {
+					 * myForwardingTable.put(index,
+					 * predForwardingTable.get(index)); } } //
+					 * myForwardingTable.putAll(predForwardingTable); //doesn't
+					 * work. replaces the value in my table if the same key
+					 * exists in pred table
+					 * 
+					 * keys = myForwardingTable.keySet(); it = keys.iterator();
+					 * System.out
+					 * .println("-------------- MERGED TABLE ----------------");
+					 * for (int j = 0; j < keys.size(); j++) { BigInteger o =
+					 * it.next(); System.out.println("Key: " + o + ", set: " +
+					 * myForwardingTable.get(o)); } // maybe
+					 * predForwardingTable.clear();
 					 */
 				}
-				
+
 				// CASE #2: my successor failed
 				if (suspectedPeer.equals(succ)) {
 					int i;
@@ -717,11 +757,10 @@ public final class Peer extends ComponentDefinition {
 							// When successor changes, send my own forwarding
 							// table to the new succ
 							/*
-							ForwardingTable table = new ForwardingTable(
-									getForwardingTable(), myAddress,
-									succ.getPeerAddress());
-							trigger(table, network);
-							*/
+							 * ForwardingTable table = new ForwardingTable(
+							 * getForwardingTable(), myAddress,
+							 * succ.getPeerAddress()); trigger(table, network);
+							 */
 							break;
 						} else
 							succ = null;
@@ -731,8 +770,10 @@ public final class Peer extends ComponentDefinition {
 
 					Snapshot.setSucc(myPeerAddress, succ);
 					longlinkhelper.updatePreSucc(pred, succ);
-					
-					Snapshot.setLonglinks(myPeerAddress, new HashSet<PeerAddress>(Arrays.asList(longlinks)));
+
+					Snapshot.setLonglinks(myPeerAddress,
+							new HashSet<PeerAddress>(Arrays.asList(longlinks)
+									.subList(0, LONGLINK_SIZE)));
 
 					for (; i > 0; i--)
 						succList = leftshift(succList);
@@ -743,20 +784,19 @@ public final class Peer extends ComponentDefinition {
 							&& succList[i].equals(suspectedPeer))
 						succList[i] = null;
 				}
-				
+
 				// CASE 3: a long link failed
 				int failedID = -1;
 				for (int i = 1; i < longlinks.length; i++) {
-					if (longlinks[i] != null && longlinks[i].equals(suspectedPeer)) {
+					if (longlinks[i] != null
+							&& longlinks[i].equals(suspectedPeer)) {
 						failedID = i;
 						break;
 					}
 				}
-				
+
 				if (failedID != -1)
 					longlinks[failedID] = null;
-				
-				
 
 				/*
 				 * friends.removeElement(suspectedPeer);
@@ -786,7 +826,7 @@ public final class Peer extends ComponentDefinition {
 	private PeerAddress closestPrecedingNode(BigInteger id) {
 		BigInteger newDistance, closestDistanceSoFar;
 		PeerAddress closestPeer = null;
-		
+
 		closestDistanceSoFar = RING_SIZE;
 		for (int i = LONGLINK_SIZE - 1; i >= 0; i--) {
 			if (longlinks[i] != null
@@ -801,9 +841,9 @@ public final class Peer extends ComponentDefinition {
 			}
 		}
 
-		if (closestPeer == null) 
+		if (closestPeer == null)
 			return myPeerAddress;
-		else 
+		else
 			return closestPeer;
 	}
 
@@ -893,7 +933,8 @@ public final class Peer extends ComponentDefinition {
 				System.out.println("# Peer " + myPeerAddress.getPeerId()
 						+ ", as a subscriber, received a notification about "
 						+ msg.getTopic());
-				Snapshot.receiveNotification(msg.getTopic(), myPeerAddress, msg.getSequenceNum());
+				Snapshot.receiveNotification(msg.getTopic(), myPeerAddress,
+						msg.getSequenceNum());
 			} else {
 				System.out
 						.println("Peer "
@@ -973,7 +1014,8 @@ public final class Peer extends ComponentDefinition {
 
 	// Helper methods
 
-	private boolean between(BigInteger destID, BigInteger predID, BigInteger myID) {
+	private boolean between(BigInteger destID, BigInteger predID,
+			BigInteger myID) {
 		if (destID.equals(myID))
 			return true;
 
@@ -999,12 +1041,11 @@ public final class Peer extends ComponentDefinition {
 		return result.mod(RING_SIZE);
 
 	}
-	
+
 	private BigInteger distance(BigInteger from, BigInteger to) {
 		// peerID < topic =: finger ------ dest
 		BigInteger distance;
-		if (from.compareTo(to) == -1
-				|| from.compareTo(to) == 0) {
+		if (from.compareTo(to) == -1 || from.compareTo(to) == 0) {
 			distance = to.subtract(from);
 		}
 		// peerID > topic =: finger --- max --- dest
@@ -1013,7 +1054,7 @@ public final class Peer extends ComponentDefinition {
 			distance = RING_SIZE.subtract(from);
 			distance = distance.add(to);// destination.subtract(nextHopID).add(RING_SIZE);
 		}
-		
+
 		return distance;
 	}
 
@@ -1030,9 +1071,8 @@ public final class Peer extends ComponentDefinition {
 				&& between(destination, pred.getPeerId(),
 						myPeerAddress.getPeerId())) {
 			// I am the rendezvous node
-			System.out.println("*** Peer " + myPeerAddress.getPeerId() + 
-										" is the rendezvous node for " +
-										destination);
+			System.out.println("*** Peer " + myPeerAddress.getPeerId()
+					+ " is the rendezvous node for " + destination);
 			return;
 		} else if (succ != null
 				&& between(destination, myPeerAddress.getPeerId(),
@@ -1079,10 +1119,10 @@ public final class Peer extends ComponentDefinition {
 				address = succ.getPeerAddress();
 				nextPeer = succ.getPeerId();
 			}
-			
-			//TODO: We need another for loop like the one below
+
+			// TODO: We need another for loop like the one below
 			// for checking friend links
-			
+
 			// then, check in the fingers list
 			for (int i = 0; i < longlinks.length; i++) {
 
@@ -1126,14 +1166,18 @@ public final class Peer extends ComponentDefinition {
 		// System.out.println("oldDistance:" + oldDistance);
 
 		if (address != null) {
-			if (myPeerAddress.getPeerId().equals(BigInteger.ZERO)) 
-				System.err.println("Peer " + myPeerAddress.getPeerId()
-						+ " routed a message on id " + nextPeer + " " + address);
-			
-			else 
-				System.out.println("Peer " + myPeerAddress.getPeerId()
-						+ " routed a message on id " + nextPeer + " " + address);
-			
+			if (myPeerAddress.getPeerId().equals(BigInteger.ZERO))
+				System.err
+						.println("Peer " + myPeerAddress.getPeerId()
+								+ " routed a message on id " + nextPeer + " "
+								+ address);
+
+			else
+				System.out
+						.println("Peer " + myPeerAddress.getPeerId()
+								+ " routed a message on id " + nextPeer + " "
+								+ address);
+
 			msg.setDestination(address);
 			trigger(msg, network);
 		}

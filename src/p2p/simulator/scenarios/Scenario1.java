@@ -18,6 +18,7 @@ public class Scenario1 extends Scenario {
 	public static String publicationsModel;
 	
 	public static int NUMBER_OF_LONGLINKS;
+	public static int NUMBER_OF_FRIENDLINKS;
 	
 	
 	public static Properties configFile = new Properties();
@@ -42,6 +43,7 @@ public class Scenario1 extends Scenario {
 		NUMBER_OF_BITS = Integer.parseInt(configFile.getProperty("NumberOfBits"));
 		
 		NUMBER_OF_LONGLINKS = Integer.parseInt(configFile.getProperty("NumberOfLonglinks"));
+		NUMBER_OF_FRIENDLINKS =  Integer.parseInt(configFile.getProperty("NumberOfFriendlinks"));
 		
 		StochasticProcess firstPeerStart = new StochasticProcess() {{
 			eventInterArrivalTime(constant(100));
