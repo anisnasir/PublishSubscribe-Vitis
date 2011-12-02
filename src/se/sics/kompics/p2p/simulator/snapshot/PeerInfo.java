@@ -20,6 +20,7 @@ public class PeerInfo {
 	private HashMap<PeerAddress, Set<BigInteger>> receivedNotifications = new HashMap<PeerAddress, Set<BigInteger>>();
 	private HashMap<PeerAddress, BigInteger> startingNumbers = new HashMap<PeerAddress, BigInteger>();
 	private BigInteger myLastPublicationID = BigInteger.ZERO;
+	private Set<BigInteger> mySubscriptions = new HashSet<BigInteger>();
 
 	// -------------------------------------------------------------------
 	public PeerInfo(PeerAddress self) {
@@ -82,6 +83,11 @@ public class PeerInfo {
 	// -------------------------------------------------------------------
 	public int getFriendlinksSize() {
 		return this.friendlinks.size();
+	}
+	
+	// -------------------------------------------------------------------
+	public Set<PeerAddress> getFriendlinks() {
+		return this.friendlinks;
 	}
 
 	// -------------------------------------------------------------------
@@ -170,6 +176,14 @@ public class PeerInfo {
 
 	public void setStartingNumber(PeerAddress publisher, BigInteger num) {
 		this.startingNumbers.put(publisher, num);
+	}
+	
+	public void setSubscriptions(Set<BigInteger> set) {
+		this.mySubscriptions = set;
+	}
+	
+	public Set<BigInteger> getSubscriptions() {
+		return this.mySubscriptions;
 	}
 
 }

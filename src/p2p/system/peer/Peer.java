@@ -93,7 +93,7 @@ public final class Peer extends ComponentDefinition {
 	private int joinCounter = 0;
 	private int replicateCounter = 0;
 	private boolean started = false;
-	private int[] linkSimilarityIndex = new int[FRIENDLINK_SIZE];
+	private double[] linkSimilarityIndex = new double[FRIENDLINK_SIZE];
 
 	private int networkSize;
 
@@ -413,21 +413,29 @@ public final class Peer extends ComponentDefinition {
 		}
 	};
 	
-	private int computeSimilarityIndex(Set<BigInteger> friendSubscriptions) {
-		int friendSimilarityIndex = 0;
+	private double computeSimilarityIndex(Set<BigInteger> friendSubscriptions) {
+		int sameTopicIDs = 0;
+		int union = 1;
+		
 		Iterator<BigInteger> itr = friendSubscriptions.iterator();
 		while (itr.hasNext()) {
 			if (mySubscriptions.containsKey(itr.next()))
-				friendSimilarityIndex++;
+				sameTopicIDs++;
 		}
 		
-		return friendSimilarityIndex;
+		if (sameTopicIDs == 0) {
+			return 0;
+		}
+		else {
+			union = friendSubscriptions.size() + mySubscriptions.size() - sameTopicIDs;
+			return ((double) sameTopicIDs) / ((double) union);
+		}
 	}
 
 	private int numOfMyFriendlinks = 0;
 	
 	private void addFriendLink(PeerAddress peer, Set<BigInteger> friendSubscriptions) {
-		int friendSimilarityIndex = 0;
+		double friendSimilarityIndex = 0;
 		
 		int j;
 		for (j = 0; j < LONGLINK_SIZE; j++) {
@@ -453,7 +461,7 @@ public final class Peer extends ComponentDefinition {
 		friendSimilarityIndex = computeSimilarityIndex(friendSubscriptions);
 
 		// finding the index with minimum value
-		int smallestValueSoFar = Integer.MAX_VALUE;
+		double smallestValueSoFar = Double.MAX_VALUE;
 		int index = -1;
 		for (int i = 0; i < linkSimilarityIndex.length; i++) {
 			if (linkSimilarityIndex[i] < smallestValueSoFar) {
@@ -462,13 +470,12 @@ public final class Peer extends ComponentDefinition {
 			}
 		}
 		
+		System.err.println("Similarity Index of source peer "
+				+ myPeerAddress.getPeerId() + " with random peer "
+				+ peer.getPeerId() + " is: " + friendSimilarityIndex);
 		
 		// prefer the higher similarity index
 		if (friendSimilarityIndex > linkSimilarityIndex[index]) {
-
-			System.err.println("Similarity Index of source peer "
-					+ myPeerAddress.getPeerId() + " with random peer "
-					+ peer.getPeerId() + " is: " + friendSimilarityIndex);
 			
 			longlinks[index + LONGLINK_SIZE] = new PeerAddress(peer);
 			linkSimilarityIndex[index] = friendSimilarityIndex;
@@ -1290,7 +1297,9 @@ public final class Peer extends ComponentDefinition {
 			BigInteger lastSequenceNumber = BigInteger.ZERO;
 			if (mySubscriptions.containsKey(topicID))
 				lastSequenceNumber = mySubscriptions.get(topicID);
+			
 			mySubscriptions.put(topicID, lastSequenceNumber);
+			Snapshot.setPeerSubscriptions(myPeerAddress, mySubscriptions.keySet());
 
 			sendSubscribeRequest(topicID, lastSequenceNumber);
 		}
@@ -1321,7 +1330,8 @@ public final class Peer extends ComponentDefinition {
 
 				// topicID should not be removed from the list, so that the next
 				// subscription can use the lastSequenceNumber
-				// mySubscriptions.remove(topicID);
+				mySubscriptions.remove(topicID);
+				Snapshot.setPeerSubscriptions(myPeerAddress, mySubscriptions.keySet());
 
 				sendUnsubscribeRequest(topicID);
 			}

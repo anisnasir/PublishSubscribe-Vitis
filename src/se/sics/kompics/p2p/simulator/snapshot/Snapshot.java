@@ -120,6 +120,7 @@ public class Snapshot {
 		str += "reverse ring: " + verifyReverseRing(peersList) + "\n";
 		str += "longlink: " + verifyLonglinks(peersList) + "\n";
 		str += "friendlink: " + verifyFriendlinks(peersList) + "\n";
+		str += "similarity index: " + computeSimilarityIndex(peersList) + "\n";
 		// str += "succList: " + verifySuccList(peersList) + "\n";
 		// str += details(peersList);
 
@@ -429,6 +430,86 @@ public class Snapshot {
 
 		return Arrays.toString(wrongs);
 
+	}
+	
+	public static void setPeerSubscriptions(PeerAddress peer, Set<BigInteger> subscriptions) {
+		PeerInfo peerInfo = peers.get(peer);
+
+		if (peerInfo == null)
+			return;
+
+		peerInfo.setSubscriptions(subscriptions);
+	}
+	
+	private static String computeSimilarityIndex(PeerAddress[] peersList) {
+		String str = "";
+		double avgSI[] = new double[peersList.length];	// avgSI = average Similarity Index
+		Set<PeerAddress> friends;
+		Iterator<PeerAddress> iter;
+		double sum;
+		int count;
+		
+		Set<BigInteger> mySubscriptions, othersSubscriptions;
+		
+		for (int i = 0; i < peersList.length; i++) {
+			PeerInfo peer = peers.get(peersList[i]);
+			mySubscriptions = peer.getSubscriptions();
+
+			if (peer == null)
+				continue;
+
+			friends = peer.getFriendlinks();
+			iter = friends.iterator();
+			sum = 0.0;
+			count = 0;
+			while (iter.hasNext()) {
+				PeerAddress tmp = iter.next();
+				if (tmp == null) 
+					continue;
+				
+				PeerInfo friend = peers.get(tmp);
+				
+				if (friend == null)
+					continue;
+				
+				count++;
+				sum += computeSimilarityIndex(mySubscriptions, friend.getSubscriptions());
+			}
+			
+			avgSI[i] = sum / (double) count;
+		}
+		
+		
+		return Arrays.toString(avgSI) + "\n total average: " + average(avgSI);
+		
+	}
+	
+	private static double average(double[] num) {
+		double sum = 0.0;
+		
+		for (int i = 0; i < num.length; i++) {
+			sum += num[i];
+		}
+		return sum/ (double) num.length;
+	}
+	
+	private static double computeSimilarityIndex(Set<BigInteger> subscriptions1, Set<BigInteger> subscriptions2) {
+		double sameTopicIDs = 0.0;
+		double union = 1.0;
+		
+		Iterator<BigInteger> itr = subscriptions2.iterator();
+		while (itr.hasNext()) {
+			if (subscriptions1.contains(itr.next()))
+				sameTopicIDs++;
+		}
+		
+		if (sameTopicIDs == 0) {
+			return 0;
+		}
+		else {
+			union = subscriptions1.size() + subscriptions2.size() - sameTopicIDs;
+			return ((double) sameTopicIDs) / ((double) union);
+		}
 	}
 
 }
