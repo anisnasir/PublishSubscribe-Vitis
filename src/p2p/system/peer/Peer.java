@@ -470,12 +470,12 @@ public final class Peer extends ComponentDefinition {
 			}
 		}
 		
-		System.err.println("Similarity Index of source peer "
-				+ myPeerAddress.getPeerId() + " with random peer "
-				+ peer.getPeerId() + " is: " + friendSimilarityIndex);
-		
 		// prefer the higher similarity index
 		if (friendSimilarityIndex > linkSimilarityIndex[index]) {
+		
+			System.err.println("Similarity Index of source peer "
+					+ myPeerAddress.getPeerId() + " with random peer "
+					+ peer.getPeerId() + " is: " + friendSimilarityIndex);
 			
 			longlinks[index + LONGLINK_SIZE] = new PeerAddress(peer);
 			linkSimilarityIndex[index] = friendSimilarityIndex;
@@ -894,6 +894,8 @@ public final class Peer extends ComponentDefinition {
 						publication.getTopic(), publication.getSequenceNum(),
 						publication.getContent(), myAddress, null);
 				forwardNotification(notification);
+				
+				Snapshot.forwardNotification(publication.getTopic(), myPeerAddress, notification.getSequenceNum());
 			} else {
 				// I am not the rendezvous node
 
@@ -933,26 +935,26 @@ public final class Peer extends ComponentDefinition {
 
 	Handler<Notification> eventNotificationHandler = new Handler<Notification>() {
 		@Override
-		public void handle(Notification msg) {
+		public void handle(Notification notification) {
 
 			// Check whether I am also the subscriber for that topicID
-			if (mySubscriptions.containsKey(msg.getTopic())) {
+			if (mySubscriptions.containsKey(notification.getTopic())) {
 				System.out.println("# Peer " + myPeerAddress.getPeerId()
 						+ ", as a subscriber, received a notification about "
-						+ msg.getTopic());
-				Snapshot.receiveNotification(msg.getTopic(), myPeerAddress,
-						msg.getSequenceNum());
+						+ notification.getTopic());
+				Snapshot.receiveNotification(notification.getTopic(), myPeerAddress,
+						notification.getSequenceNum());
 			} else {
 				System.out
 						.println("Peer "
 								+ myPeerAddress.getPeerId()
-								+ " , as a forwarder only, received a notification about "
-								+ msg.getTopic());
+								+ ", as a forwarder only, received a notification about "
+								+ notification.getTopic());
+				Snapshot.forwardNotification(notification.getTopic(), myPeerAddress, notification.getSequenceNum());
 			}
 
 			// Forward the notification using the forwardingTable
-			forwardNotification(msg);
-
+			forwardNotification(notification);
 		}
 	};
 
@@ -1005,17 +1007,15 @@ public final class Peer extends ComponentDefinition {
 			tmp.add(msg.getSource());
 			myForwardingTable.put(newMsg.getTopic(), tmp);
 
-			SubscribeRequest msg2 = new SubscribeRequest(newMsg.getTopic(),
-					newMsg.getLastSequenceNum(), newMsg.getSource(), null);
-
 			BigInteger hashedTopicID = hashFunction(msg.getTopic());
 
 			// System.out.println("id: " + myPeerAddress.getPeerId() +
 			// " destination: " + hashedTopicID + " topicID: " +
 			// msg.getTopic());
 
-			routeMessage(msg2, hashedTopicID);
-			// routeMessage(msg2, msg.getTopic());
+			routeMessage(newMsg, hashedTopicID);
+			
+			Snapshot.becomesForwarder(msg.getTopic(), myPeerAddress);
 		}
 	};
 
@@ -1208,7 +1208,8 @@ public final class Peer extends ComponentDefinition {
 				+ " hashed: " + hashedTopicID);
 
 		routeMessage(sub, hashedTopicID);
-		// routeMessage(sub, topicID);
+
+		Snapshot.becomesSubscriber(topicID, myPeerAddress);
 	}
 
 	private void sendUnsubscribeRequest(BigInteger topicID) {
@@ -1222,6 +1223,8 @@ public final class Peer extends ComponentDefinition {
 				+ " hashed: " + hashedTopicID);
 
 		routeMessage(unsub, hashedTopicID);
+		
+		// TODO: Do we have to remove this node from asForwarderSet in Snaphopt?
 	}
 
 	private void publish(BigInteger topicID, String content) {

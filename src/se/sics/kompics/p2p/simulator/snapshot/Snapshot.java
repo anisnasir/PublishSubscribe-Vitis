@@ -117,14 +117,18 @@ public class Snapshot {
 
 		String str = new String();
 		str += "ring: " + verifyRing(peersList) + "\n";
-		str += "reverse ring: " + verifyReverseRing(peersList) + "\n";
+		//str += "reverse ring: " + verifyReverseRing(peersList) + "\n";
 		str += "longlink: " + verifyLonglinks(peersList) + "\n";
-		str += "friendlink: " + verifyFriendlinks(peersList) + "\n";
-		str += "similarity index: " + computeSimilarityIndex(peersList) + "\n";
+		// str += "friendlink: " + verifyFriendlinks(peersList) + "\n";
+		// str += "similarity index: " + computeSimilarityIndex(peersList) + "\n";
 		// str += "succList: " + verifySuccList(peersList) + "\n";
 		// str += details(peersList);
-
-		str += "notifications: " + verifyNotifications(peersList) + "\n";
+		
+		
+		str += "forwarding overhead:\t" + computeForwardingOverhead(peersList)	+ "\n";
+		str += "relay node ratio: \t" + computeRelayNodeRatio(peersList) + "\n";
+		
+		//str += "notifications: " + verifyNotifications(peersList) + "\n";
 
 		return str;
 	}
@@ -378,16 +382,42 @@ public class Snapshot {
 		peerInfo.removeSubscriber(subscriber);
 	}
 
-	public static void receiveNotification(BigInteger topicID,
-			PeerAddress subscriber, BigInteger notificationID) {
+	public static void receiveNotification(BigInteger topicID, PeerAddress subscriber, BigInteger notificationID) {
 		PeerInfo peerInfo = peers.get(subscriber);
 
 		if (peerInfo == null)
 			return;
 
 		peerInfo.addNotification(peers2.get(topicID), notificationID);
+		peerInfo.incrementAsSubscriberCount();
+	}
+	
+	public static void forwardNotification(BigInteger topicID, PeerAddress forwarder, BigInteger notificationID) {
+		PeerInfo peerInfo = peers.get(forwarder);
+
+		if (peerInfo == null)
+			return;
+
+		peerInfo.incrementAsForwarderCount();
+	}
+	
+	public static void becomesForwarder(BigInteger topicID, PeerAddress forwarder) {
+		PeerInfo peerInfo = peers.get(forwarder);
+
+		if (peerInfo == null)
+			return;
+
+		peerInfo.addAsForwarderSet(topicID);
 	}
 
+	public static void becomesSubscriber(BigInteger topicID, PeerAddress subscriber) {
+		PeerInfo peerInfo = peers.get(subscriber);
+
+		if (peerInfo == null)
+			return;
+
+		peerInfo.addAsSubscriberSet(topicID);
+	}
 	public static void publish(PeerAddress publisher, BigInteger publicationID) {
 		PeerInfo peerInfo = peers.get(publisher);
 
@@ -431,6 +461,94 @@ public class Snapshot {
 		return Arrays.toString(wrongs);
 
 	}
+	
+	public static int computeTotalForwardersCount(PeerAddress[] peersList) {
+		int count = 0;
+
+		for (int i = 0; i < peersList.length; i++) {
+			PeerInfo peer = peers.get(peersList[i]);
+
+			if (peer == null)
+				continue;
+			
+			count += peer.getAsForwarderCount();
+		}
+		
+		return count;
+	}
+	
+	public static int computeTotalSubscribersCount(PeerAddress[] peersList) {
+		int count = 0;
+
+		for (int i = 0; i < peersList.length; i++) {
+			PeerInfo peer = peers.get(peersList[i]);
+
+			if (peer == null)
+				continue;
+			
+			count += peer.getAsSubscriberCount();
+		}
+		
+		return count;
+	}
+
+	public static String computeForwardingOverhead(PeerAddress[] peersList) {
+		int F = computeTotalForwardersCount(peersList);
+		int S = computeTotalSubscribersCount(peersList);
+		
+		double result = F / ((double) F + S);
+		
+		String str = " F:" + F
+			+ " S:" + S
+			+ " Overhead: " + result;
+		
+		return str;
+	}
+
+	public static int computeTotalForwardersSet(PeerAddress[] peersList) {
+		int count = 0;
+
+		for (int i = 0; i < peersList.length; i++) {
+			PeerInfo peer = peers.get(peersList[i]);
+
+			if (peer == null)
+				continue;
+			
+			count += peer.getAsForwarderSetSize();
+		}
+		
+		return count;
+	}
+	
+	public static int computeTotalSubscribersSet(PeerAddress[] peersList) {
+		int count = 0;
+
+		for (int i = 0; i < peersList.length; i++) {
+			PeerInfo peer = peers.get(peersList[i]);
+
+			if (peer == null)
+				continue;
+			
+			count += peer.getAsSubscriberSetSize();
+		}
+		
+		return count;
+	}
+	
+	public static String computeRelayNodeRatio(PeerAddress[] peersList) {
+		int F = computeTotalForwardersSet(peersList);
+		int S = computeTotalSubscribersSet(peersList);
+		double result =  F / ((double) F + S);
+		
+		String str = " F:" + F
+							+ " S:" + S
+							+ " Overhead: " + result;
+		
+		return str;
+							
+	}
+	
+	
 	
 	public static void setPeerSubscriptions(PeerAddress peer, Set<BigInteger> subscriptions) {
 		PeerInfo peerInfo = peers.get(peer);
