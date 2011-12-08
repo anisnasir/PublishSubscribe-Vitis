@@ -154,6 +154,7 @@ public class PeerInfo {
 
 		notificationList.add(notificationID);
 		
+		receivedNotifications.put(publisher, notificationList);
 	}
 
 	public void setMyLastPublicationID(BigInteger id) {
@@ -164,21 +165,23 @@ public class PeerInfo {
 		return !this.myLastPublicationID.equals(BigInteger.ZERO);
 	}
 
-	public boolean areNotificationsComplete(PeerAddress publisher,
-			BigInteger lastPublicationID) {
-		Set<BigInteger> notificationList = this.receivedNotifications
-				.get(publisher);
+	public int areNotificationsComplete(PeerAddress publisher, BigInteger lastPublicationID) {
+		Set<BigInteger> notificationList = this.receivedNotifications.get(publisher);
 
 		if (notificationList == null)
-			return false;
+			return lastPublicationID.intValue();
 
+		int missingMessages = 0;
+			
 		BigInteger bi = BigInteger.ONE; // startingNumbers.get(publisher);
 		while (!(bi.compareTo(lastPublicationID) == 1)) {
 			if (!notificationList.contains(bi))
-				return false;
+				missingMessages++;
+			
 			bi = bi.add(BigInteger.ONE);
 		}
-		return true;
+		
+		return missingMessages;
 	}
 
 	public BigInteger getLastPublicationID() {

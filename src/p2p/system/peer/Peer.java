@@ -472,11 +472,11 @@ public final class Peer extends ComponentDefinition {
 		
 		// prefer the higher similarity index
 		if (friendSimilarityIndex > linkSimilarityIndex[index]) {
-		
+/*		
 			System.err.println("Similarity Index of source peer "
 					+ myPeerAddress.getPeerId() + " with random peer "
 					+ peer.getPeerId() + " is: " + friendSimilarityIndex);
-			
+	*/		
 			longlinks[index + LONGLINK_SIZE] = new PeerAddress(peer);
 			linkSimilarityIndex[index] = friendSimilarityIndex;
 			//System.out.println(longlinks[index + LONGLINK_SIZE]);
@@ -877,7 +877,7 @@ public final class Peer extends ComponentDefinition {
 
 				System.out.println("*** $ peer " + myPeerAddress.getPeerId()
 						+ " is the rendezvous node for topicID:"
-						+ publication.getTopic());
+						+ publication.getTopic() + "-" + publication.getSequenceNum());
 
 				// Add the publication to the EventRepository according to
 				// topicID
@@ -941,7 +941,7 @@ public final class Peer extends ComponentDefinition {
 			if (mySubscriptions.containsKey(notification.getTopic())) {
 				System.out.println("# Peer " + myPeerAddress.getPeerId()
 						+ ", as a subscriber, received a notification about "
-						+ notification.getTopic());
+						+ notification.getTopic() + ":"  + notification.getSequenceNum());
 				Snapshot.receiveNotification(notification.getTopic(), myPeerAddress,
 						notification.getSequenceNum());
 			} else {
@@ -1178,13 +1178,13 @@ public final class Peer extends ComponentDefinition {
 						.println("Peer " + myPeerAddress.getPeerId()
 								+ " routed a message on id " + nextPeer + " "
 								+ address);
-
+/*
 			else
 				System.out
 						.println("Peer " + myPeerAddress.getPeerId()
 								+ " routed a message on id " + nextPeer + " "
 								+ address);
-
+*/
 			msg.setDestination(address);
 			trigger(msg, network);
 		}
@@ -1257,7 +1257,7 @@ public final class Peer extends ComponentDefinition {
 		}
 
 		Snapshot.publish(myPeerAddress, publicationSeqNum);
-		publicationSeqNum.add(BigInteger.ONE);
+		publicationSeqNum = publicationSeqNum.add(BigInteger.ONE);
 	}
 
 	Handler<Start> handleStart = new Handler<Start>() {

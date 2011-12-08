@@ -128,7 +128,7 @@ public class Snapshot {
 		str += "forwarding overhead:\t" + computeForwardingOverhead(peersList)	+ "\n";
 		str += "relay node ratio: \t" + computeRelayNodeRatio(peersList) + "\n";
 		
-		//str += "notifications: " + verifyNotifications(peersList) + "\n";
+		str += "notifications: " + verifyNotifications(peersList) + "\n";
 
 		return str;
 	}
@@ -430,6 +430,9 @@ public class Snapshot {
 	private static String verifyNotifications(PeerAddress[] peersList) {
 		String str = "";
 		int wrongs[] = new int[peersList.length];
+		
+		int totalMissingNotifications = 0;
+		int totalNotifications = 0;
 
 		for (int i = 0; i < peersList.length; i++) {
 			PeerInfo peer = peers.get(peersList[i]);
@@ -451,14 +454,16 @@ public class Snapshot {
 					if (peer2 == null)
 						continue;
 
-					if (!peer2.areNotificationsComplete(peer.getSelf(),
-							peer.getLastPublicationID()))
-						wrongs[i]++;
+					totalMissingNotifications += peer2.areNotificationsComplete(peer.getSelf(), peer.getLastPublicationID());
+					
 				}
+				totalNotifications += (subscribersList.size() * peer.getLastPublicationID().intValue());
 			}
 		}
+		
+		double hitratio = 1 - (((double) totalMissingNotifications) / totalNotifications);
 
-		return Arrays.toString(wrongs);
+		return hitratio + " T:" + totalNotifications + " M:" + totalMissingNotifications;
 
 	}
 	
