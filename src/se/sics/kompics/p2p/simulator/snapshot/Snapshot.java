@@ -2,6 +2,8 @@ package se.sics.kompics.p2p.simulator.snapshot;
 
 import java.math.BigInteger;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.TreeMap;
@@ -17,7 +19,9 @@ public class Snapshot {
 	private static Vector<PeerAddress> removedPeers = new Vector<PeerAddress>();
 	private static String FILENAME = "peer.out";
 	private static String DOTFILENAME = "peer.dot";
-
+	private static HashMap<BigInteger, Set<PeerAddress>> subscribeTree = new HashMap<BigInteger, Set<PeerAddress>>();
+	private static HashMap<BigInteger, Integer> unsubscribeTree = new HashMap<BigInteger, Integer>();
+	private static HashMap<BigInteger, Integer> multicastTree = new HashMap<BigInteger, Integer>();
 	static {
 		FileIO.write("", FILENAME);
 		FileIO.write("", DOTFILENAME);
@@ -359,6 +363,7 @@ public class Snapshot {
 	// ------------------------
 	// PUB/SUB related checking -- HIT RATIO
 
+	// Increment my subscribers
 	public static void addSubscription(BigInteger topicID,
 			PeerAddress subscriber, BigInteger lastSequenceNum) {
 		PeerInfo peerInfo = peers.get(peers2.get(topicID));
@@ -372,6 +377,7 @@ public class Snapshot {
 		peerInfo2.setStartingNumber(peers2.get(topicID), lastSequenceNum);
 	}
 
+	// Decrement my subscribers
 	public static void removeSubscription(BigInteger topicID,
 			PeerAddress subscriber) {
 		PeerInfo peerInfo = peers.get(peers2.get(topicID));
@@ -382,6 +388,7 @@ public class Snapshot {
 		peerInfo.removeSubscriber(subscriber);
 	}
 
+	// Peer has received notification as subscriber - Traffic overhead related
 	public static void receiveNotification(BigInteger topicID, PeerAddress subscriber, BigInteger notificationID) {
 		PeerInfo peerInfo = peers.get(subscriber);
 
@@ -392,6 +399,7 @@ public class Snapshot {
 		peerInfo.incrementAsSubscriberCount();
 	}
 	
+	// Peer has received notification as forwarder in relay path - Traffic overhead related
 	public static void forwardNotification(BigInteger topicID, PeerAddress forwarder, BigInteger notificationID) {
 		PeerInfo peerInfo = peers.get(forwarder);
 
@@ -401,6 +409,7 @@ public class Snapshot {
 		peerInfo.incrementAsForwarderCount();
 	}
 	
+	// Peer is participating as forwarder for a topic in the relay path - Structure related
 	public static void becomesForwarder(BigInteger topicID, PeerAddress forwarder) {
 		PeerInfo peerInfo = peers.get(forwarder);
 
@@ -410,14 +419,47 @@ public class Snapshot {
 		peerInfo.addAsForwarderSet(topicID);
 	}
 
+	// Peer is participating as subscriber for a topic in the relay path - Structure related
+
 	public static void becomesSubscriber(BigInteger topicID, PeerAddress subscriber) {
 		PeerInfo peerInfo = peers.get(subscriber);
 
 		if (peerInfo == null)
 			return;
-
+		
+		addToSubscribeTree(topicID, subscriber);
+		
 		peerInfo.addAsSubscriberSet(topicID);
 	}
+	
+	// should it be synchronized?
+	public static void addToSubscribeTree(BigInteger topicID, PeerAddress subscriber) {
+		Set<PeerAddress> relaySet = subscribeTree.get(topicID);
+		if(relaySet == null){
+			relaySet = new HashSet<PeerAddress>();
+		}
+		relaySet.add(subscriber);
+		subscribeTree.put(topicID, relaySet);
+	}
+	
+	public static void addToUnsubscribeTree(BigInteger topicID) {
+		int count = 0;
+		if (unsubscribeTree.get(topicID) != null)	
+		count = unsubscribeTree.get(topicID);
+
+		count++;
+		unsubscribeTree.put(topicID, count);
+	}
+	
+	// Max Length of multicast tree of each topic - called from rendezvous peer only
+	public static void addToMulticastTree(BigInteger topicId, int length){
+		if(multicastTree.get(topicId) == null) 
+			multicastTree.put(topicId, length);
+		else if(multicastTree.get(topicId) > length)
+			multicastTree.put(topicId, length);
+		}
+		
+	// Publisher sets the last sequence no. that it published
 	public static void publish(PeerAddress publisher, BigInteger publicationID) {
 		PeerInfo peerInfo = peers.get(publisher);
 
@@ -427,6 +469,7 @@ public class Snapshot {
 		peerInfo.setMyLastPublicationID(publicationID);
 	}
 
+	// Calculate hit ratio for notifications
 	private static String verifyNotifications(PeerAddress[] peersList) {
 		String str = "";
 		int wrongs[] = new int[peersList.length];
@@ -553,8 +596,7 @@ public class Snapshot {
 							
 	}
 	
-	
-	
+	// Set a peers own subscriptions
 	public static void setPeerSubscriptions(PeerAddress peer, Set<BigInteger> subscriptions) {
 		PeerInfo peerInfo = peers.get(peer);
 
@@ -564,6 +606,8 @@ public class Snapshot {
 		peerInfo.setSubscriptions(subscriptions);
 	}
 	
+	
+	// We might not need this
 	private static String computeSimilarityIndex(PeerAddress[] peersList) {
 		String str = "";
 		double avgSI[] = new double[peersList.length];	// avgSI = average Similarity Index
