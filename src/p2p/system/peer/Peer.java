@@ -512,7 +512,7 @@ public final class Peer extends ComponentDefinition {
 			*/
 			
 			BigInteger hashedTopicID = hashFunction(topicID);
-			SubscribeRequest sub = new SubscribeRequest(topicID, lastSequenceNumber, myAddress, null);
+			SubscribeRequest sub = new SubscribeRequest(topicID, lastSequenceNumber, myAddress, null, 0);
 
 			System.out.println("+ Peer " + myPeerAddress.getPeerId()
 					+ " is REsubscribing a SubscribeRequest topicID: " + topicID
@@ -1064,7 +1064,7 @@ public final class Peer extends ComponentDefinition {
 			// TODO: lastSequenceNum, should I check with the lastSequenceNum
 			// with respect to the forwarding table.
 			SubscribeRequest newMsg = new SubscribeRequest(msg.getTopic(),
-					msg.getLastSequenceNum(), myAddress, null);
+					msg.getLastSequenceNum(), myAddress, null, msg.getNumberOfHops() + 1);
 
 			Set<Address> tmp = myForwardingTable.get(newMsg.getTopic());
 			if (tmp == null) {
@@ -1146,6 +1146,11 @@ public final class Peer extends ComponentDefinition {
 			// I am the rendezvous node
 			System.out.println("*** Peer " + myPeerAddress.getPeerId()
 					+ " is the rendezvous node for " + destination);
+			
+			if (msg instanceof SubscribeRequest) {
+				SubscribeRequest sb = (SubscribeRequest) msg;
+				Snapshot.addDepthToMulticastTree(sb.getTopic(), sb.getNumberOfHops());
+			}
 			return;
 		} else if (succ != null
 				&& between(destination, myPeerAddress.getPeerId(),
@@ -1274,7 +1279,7 @@ public final class Peer extends ComponentDefinition {
 
 		BigInteger hashedTopicID = hashFunction(topicID);
 		SubscribeRequest sub = new SubscribeRequest(topicID, lastSequenceNum,
-				myAddress, null);
+				myAddress, null, 0);
 
 		Snapshot.addSubscription(topicID, myPeerAddress, lastSequenceNum);
 		System.out.println("+ Peer " + myPeerAddress.getPeerId()

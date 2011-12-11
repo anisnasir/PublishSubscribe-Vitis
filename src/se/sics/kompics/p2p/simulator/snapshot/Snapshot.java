@@ -21,7 +21,7 @@ public class Snapshot {
 	private static String DOTFILENAME = "peer.dot";
 	private static HashMap<BigInteger, Set<PeerAddress>> subscribeTree = new HashMap<BigInteger, Set<PeerAddress>>();
 	private static HashMap<BigInteger, Integer> unsubscribeTree = new HashMap<BigInteger, Integer>();
-	private static HashMap<BigInteger, Integer> multicastTree = new HashMap<BigInteger, Integer>();
+	private static HashMap<BigInteger, Vector<Integer>> multicastTree = new HashMap<BigInteger, Vector<Integer>>();
 	static {
 		FileIO.write("", FILENAME);
 		FileIO.write("", DOTFILENAME);
@@ -133,6 +133,8 @@ public class Snapshot {
 		str += "relay node ratio: \t" + computeRelayNodeRatio(peersList) + "\n";
 		
 		str += "notifications: " + verifyNotifications(peersList) + "\n";
+		str += "avg multicast tree depth: " + computeDepth() + "\n";
+		
 
 		return str;
 	}
@@ -451,12 +453,46 @@ public class Snapshot {
 	}
 	
 	// Max Length of multicast tree of each topic - called from rendezvous peer only
-	public static void addToMulticastTree(BigInteger topicId, int length){
-		if(multicastTree.get(topicId) == null) 
-			multicastTree.put(topicId, length);
-		else if(multicastTree.get(topicId) > length)
-			multicastTree.put(topicId, length);
+	public static void addDepthToMulticastTree(BigInteger topicId, int length){
+		Vector<Integer> depths = multicastTree.get(topicId);
+		
+		if (depths != null){
+			depths.add(length);	
 		}
+		else{
+			depths = new Vector<Integer>();
+			depths.add(length);
+		}
+		multicastTree.put(topicId, depths);
+	}
+	
+	public static Vector<Double> computeDepth(){
+		Set<BigInteger> keys = multicastTree.keySet();
+		Vector<Integer> depths = new Vector<Integer>();
+		Iterator<BigInteger> itr = keys.iterator();
+		double avgTopicDepth =0;
+		double avgSystemDepth = 0;
+		Vector<Double> arr = new  Vector<Double>();
+		
+		while(itr.hasNext()){
+			BigInteger topic = itr.next();
+			depths = multicastTree.get(topic);
+			Iterator<Integer> it = depths.iterator();
+			while(it.hasNext()){
+				avgTopicDepth += it.next();
+			}
+			avgTopicDepth/=depths.size();
+			avgSystemDepth += avgTopicDepth;
+			arr.add(avgTopicDepth);
+		}
+		if(keys.size()>0)
+		avgSystemDepth/=keys.size();
+		
+		arr.add(0, avgSystemDepth);
+		return arr;
+		//return avgSystemDepth;
+		
+	}
 		
 	// Publisher sets the last sequence no. that it published
 	public static void publish(PeerAddress publisher, BigInteger publicationID) {
