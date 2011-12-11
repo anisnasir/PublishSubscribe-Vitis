@@ -364,8 +364,7 @@ public class Snapshot {
 	// PUB/SUB related checking -- HIT RATIO
 
 	// Increment my subscribers
-	public static void addSubscription(BigInteger topicID,
-			PeerAddress subscriber, BigInteger lastSequenceNum) {
+	public static void addSubscription(BigInteger topicID, PeerAddress subscriber, BigInteger lastSequenceNum) {
 		PeerInfo peerInfo = peers.get(peers2.get(topicID));
 
 		if (peerInfo == null)
@@ -395,8 +394,8 @@ public class Snapshot {
 		if (peerInfo == null)
 			return;
 
-		peerInfo.addNotification(peers2.get(topicID), notificationID);
-		peerInfo.incrementAsSubscriberCount();
+		if (peerInfo.addNotification(peers2.get(topicID), notificationID))
+			peerInfo.incrementAsSubscriberCount();
 	}
 	
 	// Peer has received notification as forwarder in relay path - Traffic overhead related

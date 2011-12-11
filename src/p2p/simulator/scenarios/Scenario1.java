@@ -128,7 +128,7 @@ public class Scenario1 extends Scenario {
 		// TODO: ask Amir why starting the unsubcribing process after 
 		// the subscribing process will make the execution stops without no clear reason.
 		
-		termination.startAfterTerminationOf(500, unsubscribing);
+		//termination.startAfterTerminationOf(500, unsubscribing);
 	}};
 	
 //-------------------------------------------------------------------

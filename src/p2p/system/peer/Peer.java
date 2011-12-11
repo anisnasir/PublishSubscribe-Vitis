@@ -71,21 +71,19 @@ public final class Peer extends ComponentDefinition {
 	public static BigInteger RING_SIZE = new BigInteger(2 + "")
 			.pow(Configuration.Log2Ring);
 	public static int LONGLINK_SIZE = Scenario1.NUMBER_OF_LONGLINKS;
-	public static int SUCC_SIZE = Configuration.Log2Ring; // WOW! a peer has
-	public static int FRIENDLINK_SIZE = Scenario1.NUMBER_OF_FRIENDLINKS; // backup
-																			// succ
-																			// as
-	// much as the
-	// finger size??
+	public static int SUCC_SIZE = Configuration.Log2Ring; // WOW! a peer has backup succ as much as the finger size??
+	public static int FRIENDLINK_SIZE = Scenario1.NUMBER_OF_FRIENDLINKS; 
+
 	private static int WAIT_TIME_TO_REJOIN = 15;
 	private static int WAIT_TIME_TO_REPLICATE = 3;
 	private static int STABILIZING_PERIOD = 1000;
 	private PeerAddress pred;
 	private PeerAddress succ;
-	private PeerAddress[] longlinks = new PeerAddress[LONGLINK_SIZE
-			+ FRIENDLINK_SIZE];
+	private PeerAddress[] longlinks = new PeerAddress[LONGLINK_SIZE + FRIENDLINK_SIZE];
 	// private PeerAddress[] friendlinks = new PeerAddress[FRIENDLINK_SIZE];
 	private PeerAddress[] succList = new PeerAddress[SUCC_SIZE];
+	private ParentTable parentTable = new ParentTable();
+	
 	int count = 0;
 
 	private int longlinkIndex = 0;
@@ -453,7 +451,12 @@ public final class Peer extends ComponentDefinition {
 		// if I still have empty slot in friendlink, just adopt the peer without any checking
 		if (numOfMyFriendlinks < FRIENDLINK_SIZE) {
 			linkSimilarityIndex[numOfMyFriendlinks] = computeSimilarityIndex(friendSubscriptions);
+			
+			PeerAddress oldLink = longlinks[LONGLINK_SIZE + numOfMyFriendlinks];
 			longlinks[LONGLINK_SIZE + numOfMyFriendlinks] = new PeerAddress(peer);
+			Set<BigInteger> topicIDs = parentTable.changeLink(oldLink, peer.getPeerAddress());
+			resubscribe(topicIDs, oldLink);
+			
 			numOfMyFriendlinks++;
 			return;
 		}
@@ -477,7 +480,11 @@ public final class Peer extends ComponentDefinition {
 					+ myPeerAddress.getPeerId() + " with random peer "
 					+ peer.getPeerId() + " is: " + friendSimilarityIndex);
 	*/		
+			PeerAddress oldLink = longlinks[index + LONGLINK_SIZE];
 			longlinks[index + LONGLINK_SIZE] = new PeerAddress(peer);
+			Set<BigInteger> set = parentTable.changeLink(oldLink, peer.getPeerAddress());
+			resubscribe(set, oldLink);
+			
 			linkSimilarityIndex[index] = friendSimilarityIndex;
 			//System.out.println(longlinks[index + LONGLINK_SIZE]);
 			// we decided to periodically refine one friend at a time so that we
@@ -490,9 +497,48 @@ public final class Peer extends ComponentDefinition {
 		friendSimilarityIndex = 0;
 	}
 
+	private void resubscribe(Set<BigInteger> topicIDs, PeerAddress oldLink) {
+		if (topicIDs == null)
+			return;
+		
+		Iterator<BigInteger> iter = topicIDs.iterator();
+		while (iter.hasNext()) {
+			BigInteger topicID = iter.next();
+	
+			BigInteger lastSequenceNumber = BigInteger.ZERO;
+			/*
+			if (mySubscriptions.containsKey(topicID))
+				lastSequenceNumber = mySubscriptions.get(topicID);
+			*/
+			
+			BigInteger hashedTopicID = hashFunction(topicID);
+			SubscribeRequest sub = new SubscribeRequest(topicID, lastSequenceNumber, myAddress, null);
+
+			System.out.println("+ Peer " + myPeerAddress.getPeerId()
+					+ " is REsubscribing a SubscribeRequest topicID: " + topicID
+					+ " hashed: " + hashedTopicID);
+
+			routeMessage(sub, hashedTopicID);
+			
+			// Unsubscribe
+			
+			UnsubscribeRequest unsub = new UnsubscribeRequest(topicID, myAddress, oldLink.getPeerAddress());
+			
+			System.out.println("- Peer " + myPeerAddress.getPeerId()
+					+ " is triggering a UnsubscribeRequest topicID: " + topicID
+					+ " hashed: " + hashedTopicID);
+
+			trigger(unsub, network);
+		}
+	}
+
 	private void addLongLink(PeerAddress peer, int index) {
 		if (index == 0) {
+			PeerAddress oldLink = longlinks[index];
 			longlinks[index] = new PeerAddress(peer);
+			Set<BigInteger> set = parentTable.changeLink(oldLink, peer.getPeerAddress());
+			resubscribe(set, oldLink);
+			
 			fdRegister(longlinks[index]);
 		}
 
@@ -513,13 +559,18 @@ public final class Peer extends ComponentDefinition {
 				// " rejected the longlink " + peer.getPeerId());
 				return;
 			} else {
+				PeerAddress oldLink = longlinks[index];
 				longlinks[index] = new PeerAddress(peer);
+				Set<BigInteger> set = parentTable.changeLink(oldLink, peer.getPeerAddress());
+				resubscribe(set, oldLink);
+				
 				fdRegister(longlinks[index]);
 			}
 		}
 
 	}
 
+	/*
 	private void removeLonglink(PeerAddress peer) {
 		// check if peer exists
 		int exists = -1;
@@ -532,10 +583,12 @@ public final class Peer extends ComponentDefinition {
 
 		if (exists == -1)
 			System.err.println("Trying to remove invalid peer");
-		else
+		else {
+			parentTable.removeLink(longlinks[exists].getPeerAddress());
 			longlinks[exists] = null;
-
+		}
 	}
+	*/
 
 	// -------------------------------------------------------------------
 	Handler<PeriodicStabilization> handlePeriodicStabilization = new Handler<PeriodicStabilization>() {
@@ -582,7 +635,8 @@ public final class Peer extends ComponentDefinition {
 				// " is proposing a long link");
 				proposeNewLonglink();
 			}
-
+			
+			// Always try to find a new friend periodically
 			findNewFriendlink();
 		}
 	};
@@ -757,7 +811,12 @@ public final class Peer extends ComponentDefinition {
 						if (succList[i] != null
 								&& !succList[i].equals(myPeerAddress)
 								&& !succList[i].equals(suspectedPeer)) {
+							
+							PeerAddress oldLink = succ;
 							succ = succList[i];
+							Set<BigInteger> set = parentTable.changeLink(oldLink, succ.getPeerAddress());
+							resubscribe(set, oldLink);
+							
 							longlinks[0] = succ;
 							fdRegister(succ);
 							// Handling replication
@@ -769,8 +828,12 @@ public final class Peer extends ComponentDefinition {
 							 * succ.getPeerAddress()); trigger(table, network);
 							 */
 							break;
-						} else
+						} else {
+							PeerAddress oldLink = succ;
+							Set<BigInteger> set = parentTable.removeLink(succ.getPeerAddress());
 							succ = null;
+							resubscribe(set, oldLink);
+						}
 					}
 
 					joinCounter = 0;
@@ -778,9 +841,7 @@ public final class Peer extends ComponentDefinition {
 					Snapshot.setSucc(myPeerAddress, succ);
 					longlinkhelper.updatePreSucc(pred, succ);
 
-					Snapshot.setLonglinks(myPeerAddress,
-							new HashSet<PeerAddress>(Arrays.asList(longlinks)
-									.subList(0, LONGLINK_SIZE)));
+					Snapshot.setLonglinks(myPeerAddress, new HashSet<PeerAddress>(Arrays.asList(longlinks).subList(0, LONGLINK_SIZE)));
 
 					for (; i > 0; i--)
 						succList = leftshift(succList);
@@ -802,8 +863,13 @@ public final class Peer extends ComponentDefinition {
 					}
 				}
 
-				if (failedID != -1)
+				if (failedID != -1) {
+					PeerAddress oldLink = longlinks[failedID];
+					Set<BigInteger> set = parentTable.removeLink(longlinks[failedID].getPeerAddress());
 					longlinks[failedID] = null;
+					resubscribe(set, oldLink);
+					
+				}
 
 				/*
 				 * friends.removeElement(suspectedPeer);
@@ -1187,6 +1253,15 @@ public final class Peer extends ComponentDefinition {
 */
 			msg.setDestination(address);
 			trigger(msg, network);
+			
+			if (msg instanceof SubscribeRequest) {
+				SubscribeRequest sb = (SubscribeRequest) msg;
+				parentTable.addTopicID(address, sb.getTopic());
+			}
+			else if (msg instanceof UnsubscribeRequest) {
+				UnsubscribeRequest sb = (UnsubscribeRequest) msg;
+				parentTable.removeTopicID(address, sb.getTopic());
+			}
 		}
 
 		else
@@ -1195,8 +1270,7 @@ public final class Peer extends ComponentDefinition {
 	}
 
 	// -------------------------------------------------------------------------
-	private void sendSubscribeRequest(BigInteger topicID,
-			BigInteger lastSequenceNum) {
+	private void sendSubscribeRequest(BigInteger topicID, BigInteger lastSequenceNum) {
 
 		BigInteger hashedTopicID = hashFunction(topicID);
 		SubscribeRequest sub = new SubscribeRequest(topicID, lastSequenceNum,

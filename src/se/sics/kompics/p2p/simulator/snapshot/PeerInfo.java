@@ -146,15 +146,21 @@ public class PeerInfo {
 		return this.mySubscribers;
 	}
 
-	public void addNotification(PeerAddress publisher, BigInteger notificationID) {
+	public boolean addNotification(PeerAddress publisher, BigInteger notificationID) {
 		Set<BigInteger> notificationList = receivedNotifications.get(publisher);
-
-		if (notificationList == null)
+		
+		if (notificationList == null) {
 			notificationList = new HashSet<BigInteger>();
+			receivedNotifications.put(publisher, notificationList);
+		}
+		
+		if(notificationList.contains(notificationID))
+			return false;
 
 		notificationList.add(notificationID);
+		return true;
 		
-		receivedNotifications.put(publisher, notificationList);
+		//receivedNotifications.put(publisher, notificationList);
 	}
 
 	public void setMyLastPublicationID(BigInteger id) {
