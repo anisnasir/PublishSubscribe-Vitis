@@ -1029,7 +1029,7 @@ public final class Peer extends ComponentDefinition {
 			//
 			System.out.println("- Peer " + myPeerAddress.getPeerId()
 					+ " received an UnsubcribeRequest.");
-
+			Snapshot.addToUnsubscribeTree(msg.getTopic());
 			UnsubscribeRequest newMsg = new UnsubscribeRequest(msg.getTopic(),
 					myAddress, null);
 			BigInteger hashedTopicID = hashFunction(msg.getTopic());

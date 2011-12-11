@@ -2,6 +2,7 @@ package se.sics.kompics.p2p.simulator.snapshot;
 
 import java.math.BigInteger;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -134,6 +135,8 @@ public class Snapshot {
 		
 		str += "notifications: " + verifyNotifications(peersList) + "\n";
 		str += "avg multicast tree depth: " + computeDepth() + "\n";
+		str += "unSubscribe requests: " + computeUnsubscribeOverhead() + "\n";
+		
 		
 
 		return str;
@@ -450,6 +453,20 @@ public class Snapshot {
 
 		count++;
 		unsubscribeTree.put(topicID, count);
+	}
+	
+	public static String computeUnsubscribeOverhead() {
+		
+		Collection<Integer> set = unsubscribeTree.values();
+	
+		Iterator<Integer> itr =set.iterator();
+		int count = 0;
+		while(itr.hasNext())
+		{
+			count += itr.next();	
+		}
+		
+		return count+" " +set.toString();
 	}
 	
 	// Max Length of multicast tree of each topic - called from rendezvous peer only
