@@ -20,8 +20,8 @@ public class Snapshot {
 	private static Vector<PeerAddress> removedPeers = new Vector<PeerAddress>();
 	private static String FILENAME = "peer.out";
 	private static String DOTFILENAME = "peer.dot";
-	private static HashMap<BigInteger, Set<PeerAddress>> subscribeTree = new HashMap<BigInteger, Set<PeerAddress>>();
-	private static HashMap<BigInteger, Integer> unsubscribeTree = new HashMap<BigInteger, Integer>();
+	private static HashMap<BigInteger, Integer> subscribeOverhead = new HashMap<BigInteger, Integer>();
+	private static HashMap<BigInteger, Integer> unsubscribeOverhead = new HashMap<BigInteger, Integer>();
 	private static HashMap<BigInteger, Vector<Integer>> multicastTree = new HashMap<BigInteger, Vector<Integer>>();
 	static {
 		FileIO.write("", FILENAME);
@@ -136,6 +136,7 @@ public class Snapshot {
 		str += "notifications: " + verifyNotifications(peersList) + "\n";
 		str += "avg multicast tree depth: " + computeDepth() + "\n";
 		str += "unSubscribe requests: " + computeUnsubscribeOverhead() + "\n";
+		str += "Subscribe requests: " + computeSubscribeOverhead() + "\n";
 		
 		
 
@@ -431,33 +432,47 @@ public class Snapshot {
 		if (peerInfo == null)
 			return;
 		
-		addToSubscribeTree(topicID, subscriber);
-		
 		peerInfo.addAsSubscriberSet(topicID);
 	}
 	
 	// should it be synchronized?
-	public static void addToSubscribeTree(BigInteger topicID, PeerAddress subscriber) {
-		Set<PeerAddress> relaySet = subscribeTree.get(topicID);
-		if(relaySet == null){
-			relaySet = new HashSet<PeerAddress>();
-		}
-		relaySet.add(subscriber);
-		subscribeTree.put(topicID, relaySet);
+	public static void addToSubscribeTree(BigInteger topicID) {
+		int count = 0;
+		if (subscribeOverhead.get(topicID) != null)	
+		count = subscribeOverhead.get(topicID);
+
+		count++;
+		subscribeOverhead.put(topicID, count);
+		
+		
 	}
 	
 	public static void addToUnsubscribeTree(BigInteger topicID) {
 		int count = 0;
-		if (unsubscribeTree.get(topicID) != null)	
-		count = unsubscribeTree.get(topicID);
+		if (unsubscribeOverhead.get(topicID) != null)	
+		count = unsubscribeOverhead.get(topicID);
 
 		count++;
-		unsubscribeTree.put(topicID, count);
+		unsubscribeOverhead.put(topicID, count);
 	}
 	
 	public static String computeUnsubscribeOverhead() {
 		
-		Collection<Integer> set = unsubscribeTree.values();
+		Collection<Integer> set = unsubscribeOverhead.values();
+	
+		Iterator<Integer> itr =set.iterator();
+		int count = 0;
+		while(itr.hasNext())
+		{
+			count += itr.next();	
+		}
+		
+		return count+" " +set.toString();
+	}
+	
+	public static String computeSubscribeOverhead() {
+		
+		Collection<Integer> set = subscribeOverhead.values();
 	
 		Iterator<Integer> itr =set.iterator();
 		int count = 0;

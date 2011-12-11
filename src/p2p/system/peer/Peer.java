@@ -1065,14 +1065,18 @@ public final class Peer extends ComponentDefinition {
 			// with respect to the forwarding table.
 			SubscribeRequest newMsg = new SubscribeRequest(msg.getTopic(),
 					msg.getLastSequenceNum(), myAddress, null, msg.getNumberOfHops() + 1);
-
+			
+		if(!myForwardingTable.containsKey(msg.getTopic())){
+			Snapshot.addToSubscribeTree(msg.getTopic());
+		}
 			Set<Address> tmp = myForwardingTable.get(newMsg.getTopic());
 			if (tmp == null) {
 				tmp = new HashSet<Address>();
 			}
 			tmp.add(msg.getSource());
 			myForwardingTable.put(newMsg.getTopic(), tmp);
-
+			
+			
 			BigInteger hashedTopicID = hashFunction(msg.getTopic());
 
 			// System.out.println("id: " + myPeerAddress.getPeerId() +
