@@ -447,7 +447,7 @@ public class Snapshot {
 		
 	}
 	
-	public static void addToUnsubscribeTree(BigInteger topicID) {
+	public static void addToUnsubscribeOverhead(BigInteger topicID) {
 		int count = 0;
 		if (unsubscribeOverhead.get(topicID) != null)	
 		count = unsubscribeOverhead.get(topicID);

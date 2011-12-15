@@ -1029,31 +1029,34 @@ public final class Peer extends ComponentDefinition {
 			//
 			System.out.println("- Peer " + myPeerAddress.getPeerId()
 					+ " received an UnsubcribeRequest.");
-			Snapshot.addToUnsubscribeTree(msg.getTopic());
-			UnsubscribeRequest newMsg = new UnsubscribeRequest(msg.getTopic(),
-					myAddress, null);
-			BigInteger hashedTopicID = hashFunction(msg.getTopic());
+			
+			Snapshot.addToUnsubscribeOverhead(msg.getTopic());
 
-			Set<Address> subscriberlist = myForwardingTable.get(newMsg
-					.getTopic());
+			// checking the forwarding table whether I can be safely removed from the relay path
+			Set<Address> subscriberlist = myForwardingTable.get(msg.getTopic());
 			if (subscriberlist == null) {
 				System.out.println("No entry in the forwarding table.");
-				routeMessage(newMsg, hashedTopicID);
+				sendUnsubscribeRequest(msg.getTopic());
 			} else {
+				// remove the incoming link from the forwarding table based in the topic ID
 				subscriberlist.remove(msg.getSource());
+				
 				if (subscriberlist.isEmpty()) {
 					System.out.println("No more subscribers.");
-					myForwardingTable.remove(newMsg.getTopic());
-					routeMessage(newMsg, hashedTopicID);
+					myForwardingTable.remove(msg.getTopic());
+					sendUnsubscribeRequest(msg.getTopic());
 				} else {
-					myForwardingTable.put(newMsg.getTopic(), subscriberlist);
-					System.out
-							.println("Not forwarding the UnsubscribeRequest. subscriberlist: "
+					//myForwardingTable.put(msg.getTopic(), subscriberlist);
+					System.out.println("Not forwarding the UnsubscribeRequest. subscriberlist: "
 									+ subscriberlist.toString());
 				}
 			}
 		}
 	};
+	
+	private void forwardUnsubscribeRequest(UnsubscribeRequest usr) {
+		
+	}
 
 	Handler<SubscribeRequest> subscribeHandler = new Handler<SubscribeRequest>() {
 		public void handle(SubscribeRequest msg) {
@@ -1267,9 +1270,11 @@ public final class Peer extends ComponentDefinition {
 				SubscribeRequest sb = (SubscribeRequest) msg;
 				parentTable.addTopicID(address, sb.getTopic());
 			}
+			
+			// this code must not be executed, unsubscribe request is no longer forwarded using greedy routing.
 			else if (msg instanceof UnsubscribeRequest) {
 				UnsubscribeRequest sb = (UnsubscribeRequest) msg;
-				parentTable.removeTopicID(address, sb.getTopic());
+				parentTable.removeTopic(sb.getTopic());
 			}
 		}
 
@@ -1296,18 +1301,15 @@ public final class Peer extends ComponentDefinition {
 	}
 
 	private void sendUnsubscribeRequest(BigInteger topicID) {
-		BigInteger hashedTopicID = hashFunction(topicID);
-		UnsubscribeRequest unsub = new UnsubscribeRequest(topicID, myAddress,
-				null);
-
-		Snapshot.removeSubscription(topicID, myPeerAddress);
-		System.out.println("- Peer " + myPeerAddress.getPeerId()
-				+ " is triggering a UnsubscribeRequest topicID: " + topicID
-				+ " hashed: " + hashedTopicID);
-
-		routeMessage(unsub, hashedTopicID);
+		Set<Address> oldLinks = parentTable.removeTopic(topicID);
+		Iterator<Address> iter = oldLinks.iterator();
+		Address oldLink;
 		
-		// TODO: Do we have to remove this node from asForwarderSet in Snaphopt?
+		while(iter.hasNext()){
+			oldLink = iter.next();
+			UnsubscribeRequest unsub = new UnsubscribeRequest(topicID, myAddress, oldLink);
+			trigger(unsub, network);
+		}
 	}
 
 	private void publish(BigInteger topicID, String content) {
@@ -1418,8 +1420,14 @@ public final class Peer extends ComponentDefinition {
 				// subscription can use the lastSequenceNumber
 				mySubscriptions.remove(topicID);
 				Snapshot.setPeerSubscriptions(myPeerAddress, mySubscriptions.keySet());
-
-				sendUnsubscribeRequest(topicID);
+				
+				Snapshot.removeSubscription(topicID, myPeerAddress);
+				
+				// if I am also a forwarder, don't send unsubscribe request
+				// otherwise, the relay path will be broken.
+				if (!myForwardingTable.containsKey(topicID)) {
+					sendUnsubscribeRequest(topicID);
+				}
 			}
 		}
 	};
