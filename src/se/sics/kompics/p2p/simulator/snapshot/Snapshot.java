@@ -23,6 +23,8 @@ public class Snapshot {
 	private static HashMap<BigInteger, Integer> subscribeOverhead = new HashMap<BigInteger, Integer>();
 	private static HashMap<BigInteger, Integer> unsubscribeOverhead = new HashMap<BigInteger, Integer>();
 	private static HashMap<BigInteger, Vector<Integer>> multicastTree = new HashMap<BigInteger, Vector<Integer>>();
+	private static int writetograph = 0;
+	private static final int TICK = 10;
 	static {
 		FileIO.write("", FILENAME);
 		FileIO.write("", DOTFILENAME);
@@ -106,7 +108,11 @@ public class Snapshot {
 		System.out.println(str);
 
 		FileIO.append(str, FILENAME);
+		if(writetograph == TICK){
 		generateGraphVizReport();
+		writetograph = 0;
+		}
+		writetograph++;
 		// */
 	}
 
@@ -332,6 +338,9 @@ public class Snapshot {
 		String peerLabel = new String();
 		String succLabel = new String();
 		String predLabel = new String();
+		
+		String neighborLabel = new String();
+		String predSuccColor = "black";
 
 		int i = 0;
 		for (PeerAddress peer : peers.keySet()) {
@@ -347,7 +356,7 @@ public class Snapshot {
 				str += succ.getPeerId() + " [ style = filled, label = \""
 						+ succLabel + "\" ];\n";
 				str += peer.getPeerId() + "--" + succ.getPeerId()
-						+ "[ color = " + color[i] + " ];\n";
+						+ "[ color = " + predSuccColor + " ];\n";
 			}
 
 			if (pred != null) {
@@ -355,15 +364,45 @@ public class Snapshot {
 				str += pred.getPeerId() + " [ style = filled, label = \""
 						+ predLabel + "\" ];\n";
 				str += peer.getPeerId() + "--" + pred.getPeerId()
-						+ "[ color = " + color[i] + " ];\n";
+						+ "[ color = " + predSuccColor + " ];\n";
+			}
+			
+			
+			PeerInfo info = peers.get(peer);
+			int size = info.getLonglinksSize()+info.getFriendlinksSize();
+			PeerAddress[] longlinks = new PeerAddress[info.getLonglinksSize()];
+			Set<PeerAddress> friendlinks = new HashSet<PeerAddress>();
+			//PeerInfo peer = peers.get(peersList[j]);
+			longlinks = info.getLonglinks();
+			friendlinks = info.getFriendlinks();
+			//expectedFingers = getExpectedFingers(peer.getSelf(), peersList);
+			
+			for (int j = 0; j < info.getLonglinksSize(); j++) {
+				if (longlinks[j] != null ){
+					neighborLabel = longlinks[j].getPeerId().toString();
+					str += longlinks[j].getPeerId() + " [ style = filled, label = \"" + neighborLabel + "\" ];\n";
+					str += peer.getPeerId() + "--" + longlinks[j].getPeerId() + "[ color = " + color[i] + " ];\n";
+					}
 			}
 
+			Iterator<PeerAddress> itr = friendlinks.iterator();
+		//	for (int j = 0; j < info.getFriendlinksSize(); j++) {
+				while(itr.hasNext() ){
+					PeerAddress friend = itr.next();
+					if(friend!=null){
+						neighborLabel = friend.getPeerId().toString();
+						str += friend.getPeerId() + " [ style = filled, label = \"" + neighborLabel + "\" ];\n";
+						str += peer.getPeerId() + "--" + friend.getPeerId() + "[ color = " + color[i] + " ];\n";
+					}
+				}
+			
+			
 			i = (i + 1) % color.length;
 		}
 
 		str += "}\n\n";
 
-		FileIO.append(str, DOTFILENAME);
+		FileIO.write(str, DOTFILENAME);
 	}
 
 	// ------------------------
