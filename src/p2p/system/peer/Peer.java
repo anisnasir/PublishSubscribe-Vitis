@@ -433,6 +433,10 @@ public final class Peer extends ComponentDefinition {
 	private int numOfMyFriendlinks = 0;
 	
 	private void addFriendLink(PeerAddress peer, Set<BigInteger> friendSubscriptions) {
+		// to avoid self friend links
+		if (peer.equals(myPeerAddress))
+			return;
+		
 		double friendSimilarityIndex = 0;
 		
 		int j;
