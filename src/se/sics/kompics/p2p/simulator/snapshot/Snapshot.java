@@ -137,17 +137,14 @@ public class Snapshot {
 		// str += "succList: " + verifySuccList(peersList) + "\n";
 		// str += details(peersList);
 		
+		int unsub = computeUnsubscribeOverhead();
+		int sub = computeSubscribeOverhead();
+		str += "1. control message. T: " + (unsub + sub) + " U: " + unsub + " S: " + sub + "\n";
+		str += "2. average multicast tree depth. " + computeDepth() + "\n";
+		str += "3. hit ratio. notifications: " + verifyNotifications(peersList) + "\n";
+		str += "4. relay node ratio: \t" + computeRelayNodeRatio(peersList) + "\n";
+		str += "5. forwarding overhead:\t" + computeForwardingOverhead(peersList)	+ "\n";
 		
-		str += "forwarding overhead:\t" + computeForwardingOverhead(peersList)	+ "\n";
-		str += "relay node ratio: \t" + computeRelayNodeRatio(peersList) + "\n";
-		
-		str += "notifications: " + verifyNotifications(peersList) + "\n";
-		str += "avg multicast tree depth: " + computeDepth() + "\n";
-		str += "unSubscribe requests: " + computeUnsubscribeOverhead() + "\n";
-		str += "Subscribe requests: " + computeSubscribeOverhead() + "\n";
-		
-		
-
 		return str;
 	}
 
@@ -497,32 +494,40 @@ public class Snapshot {
 		unsubscribeOverhead.put(topicID, count);
 	}
 	
-	public static String computeUnsubscribeOverhead() {
+	public static int computeUnsubscribeOverhead() {
 		
 		Collection<Integer> set = unsubscribeOverhead.values();
 	
-		Iterator<Integer> itr =set.iterator();
+		int count = sum(set);
+		
+		return count;//+" " +set.toString();
+	}
+	
+	private static int sum(Collection<Integer> set) {
 		int count = 0;
+		
+		Iterator<Integer> itr =set.iterator();
 		while(itr.hasNext())
 		{
 			count += itr.next();	
 		}
 		
-		return count+" " +set.toString();
+		return count;
 	}
 	
-	public static String computeSubscribeOverhead() {
+	private static double average(Collection<Integer> set) {
+		double sum = sum(set);
+		
+		return sum / set.size();
+	}
+	
+	public static int computeSubscribeOverhead() {
 		
 		Collection<Integer> set = subscribeOverhead.values();
 	
-		Iterator<Integer> itr =set.iterator();
-		int count = 0;
-		while(itr.hasNext())
-		{
-			count += itr.next();	
-		}
+		int count = sum(set);
 		
-		return count+" " +set.toString();
+		return count; //+" " +set.toString();
 	}
 	
 	// Max Length of multicast tree of each topic - called from rendezvous peer only
@@ -540,31 +545,24 @@ public class Snapshot {
 	}
 	
 	public static Vector<Double> computeDepth(){
-		Set<BigInteger> keys = multicastTree.keySet();
-		Vector<Integer> depths = new Vector<Integer>();
-		Iterator<BigInteger> itr = keys.iterator();
-		double avgTopicDepth =0;
+		Collection<Vector<Integer>> values = multicastTree.values();
+		Iterator<Vector<Integer>> iter = values.iterator();
+		
+		Vector<Double> avgDepths = new  Vector<Double>();
+		
 		double avgSystemDepth = 0;
-		Vector<Double> arr = new  Vector<Double>();
-		
-		while(itr.hasNext()){
-			BigInteger topic = itr.next();
-			depths = multicastTree.get(topic);
-			Iterator<Integer> it = depths.iterator();
-			while(it.hasNext()){
-				avgTopicDepth += it.next();
-			}
-			avgTopicDepth/=depths.size();
-			avgSystemDepth += avgTopicDepth;
-			arr.add(avgTopicDepth);
+		double avgDepth;
+		while(iter.hasNext()) {
+			Vector<Integer> depths = iter.next();
+			avgDepth = average(depths);
+			avgDepths.add(avgDepth);
+			
+			avgSystemDepth += avgDepth;
 		}
-		if(keys.size()>0)
-		avgSystemDepth/=keys.size();
 		
-		arr.add(0, avgSystemDepth);
-		return arr;
-		//return avgSystemDepth;
-		
+		avgSystemDepth /= multicastTree.size();
+		avgDepths.add(0, avgSystemDepth);
+		return avgDepths;
 	}
 		
 	// Publisher sets the last sequence no. that it published
@@ -652,7 +650,7 @@ public class Snapshot {
 		int F = computeTotalForwardersCount(peersList);
 		int S = computeTotalSubscribersCount(peersList);
 		
-		double result = F / ((double) F + S);
+		double result = F / ((double) S);
 		
 		String str = " F:" + F
 			+ " S:" + S
@@ -694,11 +692,11 @@ public class Snapshot {
 	public static String computeRelayNodeRatio(PeerAddress[] peersList) {
 		int F = computeTotalForwardersSet(peersList);
 		int S = computeTotalSubscribersSet(peersList);
-		double result =  F / ((double) F + S);
+		double overhead =  F / ((double) S);
 		
 		String str = " F:" + F
 							+ " S:" + S
-							+ " Overhead: " + result;
+							+ " Overhead: " + overhead;
 		
 		return str;
 							
