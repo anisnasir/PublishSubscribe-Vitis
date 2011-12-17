@@ -73,6 +73,7 @@ public final class Peer extends ComponentDefinition {
 	public static int LONGLINK_SIZE = Scenario1.NUMBER_OF_LONGLINKS;
 	public static int SUCC_SIZE = Configuration.Log2Ring; // WOW! a peer has backup succ as much as the finger size??
 	public static int FRIENDLINK_SIZE = Scenario1.NUMBER_OF_FRIENDLINKS; 
+	public static int SAMPLING_SIZE = FRIENDLINK_SIZE*2; 
 
 	private static int WAIT_TIME_TO_REJOIN = 15;
 	private static int WAIT_TIME_TO_REPLICATE = 3;
@@ -399,7 +400,7 @@ public final class Peer extends ComponentDefinition {
 			PeerAddress responsible = event.getResponsible();
 			Set<BigInteger> friendSubscriptions = event.getSubscriptionList();
 
-			addFriendLink(responsible, friendSubscriptions);
+			addFriendLink(responsible, computeSimilarityIndex(friendSubscriptions));
 			// TODO: modify Snapshot
 			// Snapshot.setLonglinks(myPeerAddress, new
 			// HashSet<PeerAddress>(Arrays.asList(longlinks)));
@@ -432,12 +433,14 @@ public final class Peer extends ComponentDefinition {
 
 	private int numOfMyFriendlinks = 0;
 	
-	private void addFriendLink(PeerAddress peer, Set<BigInteger> friendSubscriptions) {
+	private void addFriendLink(PeerAddress peer, double friendSimilarityIndex) {
 		// to avoid self friend links
 		if (peer.equals(myPeerAddress))
 			return;
 		
-		double friendSimilarityIndex = 0;
+		//double friendSimilarityIndex = 0;
+		
+		//System.out.println("+++++++++" + friendSimilarityIndex + Arrays.toString(longlinks));
 		
 		int j;
 		for (j = 0; j < LONGLINK_SIZE; j++) {
@@ -447,14 +450,16 @@ public final class Peer extends ComponentDefinition {
 		
 		for (;j < longlinks.length; j++) {
 			if (longlinks[j] != null && longlinks[j].equals(peer)) {
-				linkSimilarityIndex[j - LONGLINK_SIZE] = computeSimilarityIndex(friendSubscriptions);
+				linkSimilarityIndex[j - LONGLINK_SIZE] = friendSimilarityIndex;
 				return;
 			}
 		}
 		
+		
+		
 		// if I still have empty slot in friendlink, just adopt the peer without any checking
 		if (numOfMyFriendlinks < FRIENDLINK_SIZE) {
-			linkSimilarityIndex[numOfMyFriendlinks] = computeSimilarityIndex(friendSubscriptions);
+			linkSimilarityIndex[numOfMyFriendlinks] = friendSimilarityIndex;
 			
 			PeerAddress oldLink = longlinks[LONGLINK_SIZE + numOfMyFriendlinks];
 			longlinks[LONGLINK_SIZE + numOfMyFriendlinks] = new PeerAddress(peer);
@@ -464,41 +469,47 @@ public final class Peer extends ComponentDefinition {
 			numOfMyFriendlinks++;
 			return;
 		}
-		
-		friendSimilarityIndex = computeSimilarityIndex(friendSubscriptions);
-
-		// finding the index with minimum value
-		double smallestValueSoFar = Double.MAX_VALUE;
-		int index = -1;
-		for (int i = 0; i < linkSimilarityIndex.length; i++) {
-			if (linkSimilarityIndex[i] < smallestValueSoFar) {
-				smallestValueSoFar = linkSimilarityIndex[i];
-				index = i;
-			}
-		}
-		
-		// prefer the higher similarity index
-		if (friendSimilarityIndex > linkSimilarityIndex[index]) {
-/*		
-			System.err.println("Similarity Index of source peer "
-					+ myPeerAddress.getPeerId() + " with random peer "
-					+ peer.getPeerId() + " is: " + friendSimilarityIndex);
-	*/		
-			PeerAddress oldLink = longlinks[index + LONGLINK_SIZE];
-			longlinks[index + LONGLINK_SIZE] = new PeerAddress(peer);
-			Set<BigInteger> set = parentTable.changeLink(oldLink, peer.getPeerAddress());
-			resubscribe(set, oldLink);
+		else {
 			
-			linkSimilarityIndex[index] = friendSimilarityIndex;
-			//System.out.println(longlinks[index + LONGLINK_SIZE]);
-			// we decided to periodically refine one friend at a time so that we
-			// can get a better and better similarity index
-
-			// fdRegister(longlinks[index + LONGLINK_SIZE]);
-		} else {
-			//System.out.println(" rejected");
-		}
-		friendSimilarityIndex = 0;
+			//friendSimilarityIndex = computeSimilarityIndex(friendSubscriptions);
+	
+			// finding the index with minimum value
+			double smallestValueSoFar = Double.MAX_VALUE;
+			int index = -1;
+			for (int i = 0; i < linkSimilarityIndex.length; i++) {
+				if (linkSimilarityIndex[i] < smallestValueSoFar) {
+					smallestValueSoFar = linkSimilarityIndex[i];
+					index = i;
+				}
+			}
+			
+			// prefer the higher similarity index
+			if (friendSimilarityIndex > linkSimilarityIndex[index]) {
+	/*		
+				System.err.println("Similarity Index of source peer "
+						+ myPeerAddress.getPeerId() + " with random peer "
+						+ peer.getPeerId() + " is: " + friendSimilarityIndex);
+		*/		
+				PeerAddress oldLink = longlinks[index + LONGLINK_SIZE];
+				longlinks[index + LONGLINK_SIZE] = new PeerAddress(peer);
+				Set<BigInteger> set = parentTable.changeLink(oldLink, peer.getPeerAddress());
+				resubscribe(set, oldLink);
+				
+				linkSimilarityIndex[index] = friendSimilarityIndex;
+				//System.out.println(longlinks[index + LONGLINK_SIZE]);
+				
+				// we decided to periodically refine one friend at a time so that we
+				// can get a better and better similarity index
+	
+				// fdRegister(longlinks[index + LONGLINK_SIZE]);
+			} else {
+				//System.out.println(" rejected");
+			}
+		}	
+		Snapshot.setFriendlinks(
+						myPeerAddress,
+						new HashSet<PeerAddress>(Arrays.asList(longlinks).subList(
+						LONGLINK_SIZE, LONGLINK_SIZE + FRIENDLINK_SIZE)));
 	}
 
 	private void resubscribe(Set<BigInteger> topicIDs, PeerAddress oldLink) {
@@ -641,9 +652,41 @@ public final class Peer extends ComponentDefinition {
 			}
 			
 			// Always try to find a new friend periodically
-			findNewFriendlink();
+			//findNewFriendlink();
+			
+			adoptNewFriendLinks();
 		}
 	};
+	
+	private void adoptNewFriendLinks() {
+		// get random nodes from Snapshot
+		HashMap<PeerAddress, Set<BigInteger>> randomNodes = Snapshot.getRandomNodes(SAMPLING_SIZE);
+		
+		// indicates that Snapshot is not ready yet 
+		if (randomNodes == null)
+			return;
+		
+		// select a node with a highest similarity index
+		double highestSoFar = -1;
+		PeerAddress peerWithHighestSI = null;
+		
+		double si;
+		PeerAddress peer;
+		
+		Iterator<PeerAddress> iter = randomNodes.keySet().iterator();
+		while(iter.hasNext()) {
+			peer = iter.next();
+			si = computeSimilarityIndex(randomNodes.get(peer));
+			if (si > highestSoFar) {
+				highestSoFar = si;
+				peerWithHighestSI = peer;
+			}
+		}
+		
+		if (peerWithHighestSI != null) {
+			addFriendLink(peerWithHighestSI, highestSoFar);
+		}
+	}
 
 	private void proposeNewLonglink() {
 		int index = longlinkhelper.obtainNewLongLinkID();
@@ -1208,10 +1251,8 @@ public final class Peer extends ComponentDefinition {
 				address = succ.getPeerAddress();
 				nextPeer = succ.getPeerId();
 			}
-
-			// TODO: We need another for loop like the one below
-			// for checking friend links
-
+			
+			// note that the finger links are stored in longlinks
 			// then, check in the fingers list
 			for (int i = 0; i < longlinks.length; i++) {
 

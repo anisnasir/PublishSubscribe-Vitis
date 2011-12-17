@@ -6,6 +6,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.Vector;
@@ -25,6 +26,7 @@ public class Snapshot {
 	private static HashMap<BigInteger, Vector<Integer>> multicastTree = new HashMap<BigInteger, Vector<Integer>>();
 	private static int writetograph = 0;
 	private static final int TICK = 10;
+	private static final Random rand = new Random();
 	static {
 		FileIO.write("", FILENAME);
 		FileIO.write("", DOTFILENAME);
@@ -130,7 +132,7 @@ public class Snapshot {
 		str += "ring: " + verifyRing(peersList) + "\n";
 		//str += "reverse ring: " + verifyReverseRing(peersList) + "\n";
 		str += "longlink: " + verifyLonglinks(peersList) + "\n";
-		// str += "friendlink: " + verifyFriendlinks(peersList) + "\n";
+		str += "friendlink: " + verifyFriendlinks(peersList) + "\n";
 		// str += "similarity index: " + computeSimilarityIndex(peersList) + "\n";
 		// str += "succList: " + verifySuccList(peersList) + "\n";
 		// str += details(peersList);
@@ -783,6 +785,32 @@ public class Snapshot {
 			union = subscriptions1.size() + subscriptions2.size() - sameTopicIDs;
 			return ((double) sameTopicIDs) / ((double) union);
 		}
+	}
+	
+	public static HashMap<PeerAddress, Set<BigInteger>> getRandomNodes(int numberOfNodesRequired) {
+		HashMap<PeerAddress, Set<BigInteger>> result = new HashMap<PeerAddress, Set<BigInteger>>();
+		PeerAddress[] peersList = new PeerAddress[peers.size()];
+		peers.keySet().toArray(peersList);
+		
+		if (peersList.length < numberOfNodesRequired + 1) {
+			System.err.println("Out of bound");
+			return null;
+		}
+		
+		PeerAddress peer;
+		PeerInfo peerinfo;
+		while (result.size() <= numberOfNodesRequired) {
+			peer = peersList[rand.nextInt(peersList.length)];
+			
+			// make sure that all the elements are unique
+			if (!result.containsKey(peer)) {
+				peerinfo = peers.get(peer);
+				result.put(peer, peerinfo.getSubscriptions());
+			}
+		}
+		
+		return result;
+		
 	}
 
 }
