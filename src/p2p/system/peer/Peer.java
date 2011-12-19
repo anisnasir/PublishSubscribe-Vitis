@@ -229,8 +229,7 @@ public final class Peer extends ComponentDefinition {
 			trigger(new PingFailureDetectorInit(myAddress,
 					init.getFdConfiguration()), fd.getControl());
 
-			System.out.println("Peer " + myPeerAddress.getPeerId()
-					+ " is initialized.");
+		//	System.out.println("Peer " + myPeerAddress.getPeerId()	+ " is initialized.");
 		}
 	};
 

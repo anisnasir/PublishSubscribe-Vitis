@@ -40,7 +40,9 @@ public class Snapshot {
 	private static HashMap<BigInteger, Integer> unsubscribeOverhead = new HashMap<BigInteger, Integer>();
 	private static HashMap<BigInteger, Vector<Integer>> multicastTree = new HashMap<BigInteger, Vector<Integer>>();
 	private static int writetograph = 0;
+	private static int writetofile = 0;
 	private static final int TICK = 10;
+	
 	private static final Random rand = new Random();
 	private static final DecimalFormat df4 = new DecimalFormat("#.0000");
 	private static final DecimalFormat df2 = new DecimalFormat("#.00");
@@ -181,8 +183,12 @@ public class Snapshot {
 						df0.format(forwardingOverhead.get(1)) + "\t" +
 						df4.format(forwardingOverhead.get(2))  + "\n";
 						
-		
+		if(writetofile == TICK){
 		FileIO.append(trace, TRACESOUT);
+		writetofile = 0;
+		}
+		
+		writetofile++;
 		return str;
 	}
 
