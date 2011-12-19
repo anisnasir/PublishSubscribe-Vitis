@@ -526,6 +526,16 @@ public class Snapshot {
 		peerInfo.addAsSubscriberSet(topicID);
 	}
 	
+	public static void cancelSubscriber(BigInteger topicID, PeerAddress subscriber) {
+		PeerInfo peerInfo = peers.get(subscriber);
+
+		if (peerInfo == null)
+			return;
+		
+		peerInfo.removeFromAsSubscriberSet(topicID);
+	}
+	
+	
 	// should it be synchronized?
 	public static void addToSubscribeTree(BigInteger topicID) {
 		int count = 0;

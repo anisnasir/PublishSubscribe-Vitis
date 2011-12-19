@@ -543,6 +543,7 @@ public final class Peer extends ComponentDefinition {
 				//	+ " hashed: " + hashedTopicID);
 
 			trigger(unsub, network);
+			Snapshot.cancelForwarder(unsub.getTopic(), myPeerAddress);
 		}
 	}
 
@@ -1081,6 +1082,7 @@ public final class Peer extends ComponentDefinition {
 			if (subscriberlist == null) {
 				System.out.println("No entry in the forwarding table.");
 				sendUnsubscribeRequest(msg.getTopic());
+				Snapshot.cancelForwarder(msg.getTopic(), myPeerAddress);
 			} else {
 				// remove the incoming link from the forwarding table based in the topic ID
 				subscriberlist.remove(msg.getSource());
@@ -1089,6 +1091,7 @@ public final class Peer extends ComponentDefinition {
 			//		System.out.println("No more subscribers.");
 					myForwardingTable.remove(msg.getTopic());
 					sendUnsubscribeRequest(msg.getTopic());
+					Snapshot.cancelForwarder(msg.getTopic(), myPeerAddress);
 				} else {
 					//myForwardingTable.put(msg.getTopic(), subscriberlist);
 			//		System.out.println("Not forwarding the UnsubscribeRequest. subscriberlist: "
@@ -1347,10 +1350,16 @@ public final class Peer extends ComponentDefinition {
 		Iterator<Address> iter = oldLinks.iterator();
 		Address oldLink;
 		
+		/*
+		System.out.println("\nPeer " + myPeerAddress.getPeerId()
+				+ " unsubscribe.");
+		*/
+		
 		while(iter.hasNext()){
 			oldLink = iter.next();
 			UnsubscribeRequest unsub = new UnsubscribeRequest(topicID, myAddress, oldLink);
 			trigger(unsub, network);
+			//Snapshot.cancelForwarder(unsub.getTopic(), myPeerAddress);
 		}
 	}
 
@@ -1469,6 +1478,7 @@ public final class Peer extends ComponentDefinition {
 				// otherwise, the relay path will be broken.
 				if (!myForwardingTable.containsKey(topicID)) {
 					sendUnsubscribeRequest(topicID);
+					Snapshot.cancelSubscriber(topicID, myPeerAddress);
 				}
 			}
 		}
