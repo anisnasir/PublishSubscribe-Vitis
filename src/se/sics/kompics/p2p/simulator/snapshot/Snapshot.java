@@ -24,7 +24,7 @@ public class Snapshot {
 	private static String FILENAME = "peer.out";
 	private static String DOTFILENAME = "peer.dot";
 	private static String TRACESOUT = DateUtils.now() + "_" + Scenario1.NUMBER_OF_PEERS +  ".txt";
-	private static String TRACE_HEADER = "#Settings: \n # Peers: "+Scenario1.NUMBER_OF_PEERS+" #Subscriptions: "+Scenario1.NUMBER_OF_SUBCRIPTIONS+" #Publications: "+Scenario1.NUMBER_OF_PUBLICATIONS
+	private static String TRACE_HEADER = "#Settings: \n# Peers: "+Scenario1.NUMBER_OF_PEERS+" #Subscriptions: "+Scenario1.NUMBER_OF_SUBCRIPTIONS+" #Publications: "+Scenario1.NUMBER_OF_PUBLICATIONS
 	+" #UnSubscriptions: "+Scenario1.NUMBER_OF_UNSUBSCRIPTIONS+" Subscription model: "+Scenario1.subscriptionsModel+ "\n"+
 											"#1. counter\n" + 
 											"#2. Unsubscribe request messages\n" + 
@@ -44,7 +44,7 @@ public class Snapshot {
 	private static HashMap<BigInteger, Vector<Integer>> multicastTreeDepths = new HashMap<BigInteger, Vector<Integer>>();
 	private static int writetograph = 0;
 	private static int writetofile = 0;
-	private static final int TICK = 10;
+	private static final int TICK = 1;
 	
 	private static final Random rand = new Random();
 	private static final DecimalFormat df4 = new DecimalFormat("#.0000");
