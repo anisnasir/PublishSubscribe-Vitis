@@ -528,9 +528,9 @@ public final class Peer extends ComponentDefinition {
 			BigInteger hashedTopicID = hashFunction(topicID);
 			SubscribeRequest sub = new SubscribeRequest(topicID, lastSequenceNumber, myAddress, null, 0);
 
-			System.out.println("+ Peer " + myPeerAddress.getPeerId()
-					+ " is REsubscribing a SubscribeRequest topicID: " + topicID
-					+ " hashed: " + hashedTopicID);
+		//	System.out.println("+ Peer " + myPeerAddress.getPeerId()
+			//		+ " is REsubscribing a SubscribeRequest topicID: " + topicID
+				//	+ " hashed: " + hashedTopicID);
 
 			routeMessage(sub, hashedTopicID);
 			
@@ -538,9 +538,9 @@ public final class Peer extends ComponentDefinition {
 			
 			UnsubscribeRequest unsub = new UnsubscribeRequest(topicID, myAddress, oldLink.getPeerAddress());
 			
-			System.out.println("- Peer " + myPeerAddress.getPeerId()
-					+ " is triggering a UnsubscribeRequest topicID: " + topicID
-					+ " hashed: " + hashedTopicID);
+		//	System.out.println("- Peer " + myPeerAddress.getPeerId()
+			//		+ " is triggering a UnsubscribeRequest topicID: " + topicID
+				//	+ " hashed: " + hashedTopicID);
 
 			trigger(unsub, network);
 		}
@@ -987,9 +987,9 @@ public final class Peer extends ComponentDefinition {
 					myPeerAddress.getPeerId())) {
 				// I am the rendezvous node
 
-				System.out.println("*** $ peer " + myPeerAddress.getPeerId()
-						+ " is the rendezvous node for topicID:"
-						+ publication.getTopic() + "-" + publication.getSequenceNum());
+			//	System.out.println("*** $ peer " + myPeerAddress.getPeerId()
+				//		+ " is the rendezvous node for topicID:"
+					//	+ publication.getTopic() + "-" + publication.getSequenceNum());
 
 				// Add the publication to the EventRepository according to
 				// topicID
@@ -1051,17 +1051,15 @@ public final class Peer extends ComponentDefinition {
 
 			// Check whether I am also the subscriber for that topicID
 			if (mySubscriptions.containsKey(notification.getTopic())) {
-				System.out.println("# Peer " + myPeerAddress.getPeerId()
-						+ ", as a subscriber, received a notification about "
-						+ notification.getTopic() + ":"  + notification.getSequenceNum());
+			//	System.out.println("# Peer " + myPeerAddress.getPeerId()
+				//		+ ", as a subscriber, received a notification about "
+					//	+ notification.getTopic() + ":"  + notification.getSequenceNum());
 				Snapshot.receiveNotification(notification.getTopic(), myPeerAddress,
 						notification.getSequenceNum());
 			} else {
-				System.out
-						.println("Peer "
-								+ myPeerAddress.getPeerId()
-								+ ", as a forwarder only, received a notification about "
-								+ notification.getTopic());
+		//		System.out.println("Peer "+ myPeerAddress.getPeerId()
+			//					+ ", as a forwarder only, received a notification about "
+				//				+ notification.getTopic());
 				Snapshot.forwardNotification(notification.getTopic(), myPeerAddress, notification.getSequenceNum());
 			}
 
@@ -1073,8 +1071,8 @@ public final class Peer extends ComponentDefinition {
 	Handler<UnsubscribeRequest> unsubscribeHandler = new Handler<UnsubscribeRequest>() {
 		public void handle(UnsubscribeRequest msg) {
 			//
-			System.out.println("- Peer " + myPeerAddress.getPeerId()
-					+ " received an UnsubcribeRequest.");
+		//	System.out.println("- Peer " + myPeerAddress.getPeerId()
+			//		+ " received an UnsubcribeRequest.");
 			
 			Snapshot.addToUnsubscribeOverhead(msg.getTopic());
 
@@ -1088,13 +1086,13 @@ public final class Peer extends ComponentDefinition {
 				subscriberlist.remove(msg.getSource());
 				
 				if (subscriberlist.isEmpty()) {
-					System.out.println("No more subscribers.");
+			//		System.out.println("No more subscribers.");
 					myForwardingTable.remove(msg.getTopic());
 					sendUnsubscribeRequest(msg.getTopic());
 				} else {
 					//myForwardingTable.put(msg.getTopic(), subscriberlist);
-					System.out.println("Not forwarding the UnsubscribeRequest. subscriberlist: "
-									+ subscriberlist.toString());
+			//		System.out.println("Not forwarding the UnsubscribeRequest. subscriberlist: "
+				//					+ subscriberlist.toString());
 				}
 			}
 		}
@@ -1197,8 +1195,8 @@ public final class Peer extends ComponentDefinition {
 				&& between(destination, pred.getPeerId(),
 						myPeerAddress.getPeerId())) {
 			// I am the rendezvous node
-			System.out.println("*** Peer " + myPeerAddress.getPeerId()
-					+ " is the rendezvous node for " + destination);
+		//	System.out.println("*** Peer " + myPeerAddress.getPeerId()
+			//		+ " is the rendezvous node for " + destination);
 			
 			if (msg instanceof SubscribeRequest) {
 				SubscribeRequest sb = (SubscribeRequest) msg;
@@ -1335,9 +1333,9 @@ public final class Peer extends ComponentDefinition {
 				myAddress, null, 0);
 
 		Snapshot.addSubscription(topicID, myPeerAddress, lastSequenceNum);
-		System.out.println("+ Peer " + myPeerAddress.getPeerId()
-				+ " is triggering a SubscribeRequest topicID: " + topicID
-				+ " hashed: " + hashedTopicID);
+	//	System.out.println("+ Peer " + myPeerAddress.getPeerId()
+		//		+ " is triggering a SubscribeRequest topicID: " + topicID
+			//	+ " hashed: " + hashedTopicID);
 
 		routeMessage(sub, hashedTopicID);
 
@@ -1357,8 +1355,8 @@ public final class Peer extends ComponentDefinition {
 	}
 
 	private void publish(BigInteger topicID, String content) {
-		System.out.println("\nPeer " + myPeerAddress.getPeerId()
-				+ " is publishing an event.");
+	//	System.out.println("\nPeer " + myPeerAddress.getPeerId()
+		//		+ " is publishing an event.");
 
 		Publication publication = new Publication(topicID, publicationSeqNum,
 				content, myAddress, null);
@@ -1375,13 +1373,13 @@ public final class Peer extends ComponentDefinition {
 			// Stop routing the publication
 			// And then, start to forward the corresponding notification based
 			// on the forwardingTable
-			System.out.println("$ I am the rendezvous node.");
+		//	System.out.println("$ I am the rendezvous node.");
 			Notification notification = new Notification(
 					publication.getTopic(), publication.getSequenceNum(),
 					publication.getContent(), myAddress, null);
 			forwardNotification(notification);
 		} else {
-			System.out.println("$ Route the message.");
+			//System.out.println("$ Route the message.");
 			routeMessage(publication, hashedTopicID);
 		}
 
@@ -1441,8 +1439,8 @@ public final class Peer extends ComponentDefinition {
 		@Override
 		public void handle(UnsubscribePeer event) {
 
-			System.out.println("Peer " + myPeerAddress.getPeerId()
-					+ " is unsubscribing an event.");
+		//	System.out.println("Peer " + myPeerAddress.getPeerId()
+			//		+ " is unsubscribing an event.");
 
 			if (!mySubscriptions.isEmpty()) {
 				Set<BigInteger> topicIDs = mySubscriptions.keySet(); // TODO: we

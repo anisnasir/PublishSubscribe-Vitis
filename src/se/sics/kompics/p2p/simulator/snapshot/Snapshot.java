@@ -165,7 +165,7 @@ public class Snapshot {
 		Vector<Double> relaynode = computeRelayNodeRatio(peersList);
 		Vector<Double> forwardingOverhead = computeForwardingOverhead(peersList);
 		str += "1. control message. T: " + (unsub + sub) + " U: " + unsub + " S: " + sub + "\n";
-		str += "2. average multicast tree depth. " + depths + "\n";
+		str += "2. average multicast tree depth. " + depths.get(0) + "\n";
 		str += "3. hit ratio. notifications: " + hitratio + "\n";
 		str += "4. relay node ratio: \t" + relaynode + "\n";
 		str += "5. forwarding overhead:\t" + forwardingOverhead	+ "\n";
