@@ -222,6 +222,10 @@ public class PeerInfo {
 		this.asForwarderSet.add(topicID);
 	}
 	
+	public void removeFromAsForwarderSet(BigInteger topicID) {
+		this.asForwarderSet.remove(topicID);
+	}
+	
 	public int getAsForwarderSetSize() {
 		this.asForwarderSet.removeAll(this.asSubscriberSet);
 		return this.asForwarderSet.size();
