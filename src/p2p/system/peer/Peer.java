@@ -1194,6 +1194,7 @@ public final class Peer extends ComponentDefinition {
 		// System.out.println("id: " + myPeerAddress.getPeerId() +
 		// " destination: " + destination);
 
+		// case #1: check if the message is my own responsibility
 		if (pred != null
 				&& between(destination, pred.getPeerId(),
 						myPeerAddress.getPeerId())) {
@@ -1206,13 +1207,19 @@ public final class Peer extends ComponentDefinition {
 				Snapshot.addDepthToMulticastTree(sb.getTopic(), sb.getNumberOfHops());
 			}
 			return;
-		} else if (succ != null
+		} 
+		
+		// case #2: check if the message is the successor's responsibility
+		else if (succ != null
 				&& between(destination, myPeerAddress.getPeerId(),
 						succ.getPeerId())) {
 			// The rendezvous node is the successor
 			address = succ.getPeerAddress();
 			nextPeer = succ.getPeerId();
-		} else {
+		} 
+		
+		// case #3: neither my responsibility nor successor's
+		else {
 			// I am not the rendezvous node, route the message to the rendezvous
 			// node
 
@@ -1221,6 +1228,7 @@ public final class Peer extends ComponentDefinition {
 				System.err.println("Peer " + myPeerAddress.getPeerId()
 						+ ": pred is null.");
 
+			// case #3a: check the succ first, just to set the default result to succ
 			// first, check in the succ list
 			if (succ != null) {
 				// System.out.println("succ: " + succ.getPeerId() +
@@ -1242,9 +1250,6 @@ public final class Peer extends ComponentDefinition {
 			} else
 				System.err.println("succ is null");
 
-			// System.out.println("nextHopID: " + nextHopID + ", distance: " +
-			// newDistance);
-
 			// newDistance < oldDisntace
 			if (newDistance.compareTo(oldDistance) == -1) {
 				oldDistance = newDistance;
@@ -1252,6 +1257,8 @@ public final class Peer extends ComponentDefinition {
 				nextPeer = succ.getPeerId();
 			}
 			
+			// case #3b: check all the links iteratively
+			// note that the links are not necessarily stored in the ascending order of distance
 			// note that the finger links are stored in longlinks
 			// then, check in the fingers list
 			for (int i = 0; i < longlinks.length; i++) {
