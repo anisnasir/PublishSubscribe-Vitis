@@ -118,9 +118,9 @@ public final class Peer extends ComponentDefinition {
 	private HashMap<Address, UUID> fdRequests;
 	private HashMap<Address, PeerAddress> fdPeers;
 
-	private HashMap<BigInteger, BigInteger> mySubscriptions; // <Topic ID, last
-																// sequence
-																// number>
+	private HashMap<PeerAddress, Set<BigInteger>> otherSubscriptions; // PeerAddress -> Set<TopicID>
+	
+	private HashMap<BigInteger, BigInteger> mySubscriptions; // <Topic ID, last sequencenumber>
 	private HashMap<BigInteger, Vector<Publication>> eventRepository; // <Topic
 																		// ID,
 																		// list
@@ -152,6 +152,7 @@ public final class Peer extends ComponentDefinition {
 		fdRequests = new HashMap<Address, UUID>();
 		fdPeers = new HashMap<Address, PeerAddress>();
 		rand = new Random(System.currentTimeMillis());
+		otherSubscriptions = new HashMap<PeerAddress, Set<BigInteger>>();
 		mySubscriptions = new HashMap<BigInteger, BigInteger>();
 		eventRepository = new HashMap<BigInteger, Vector<Publication>>();
 		myForwardingTable = new HashMap<BigInteger, Set<Address>>();
@@ -399,7 +400,7 @@ public final class Peer extends ComponentDefinition {
 			PeerAddress responsible = event.getResponsible();
 			Set<BigInteger> friendSubscriptions = event.getSubscriptionList();
 
-			addFriendLink(responsible, computeSimilarityIndex(friendSubscriptions));
+			addFriendLink(responsible, computeSimilarityIndex(friendSubscriptions), friendSubscriptions);
 			// TODO: modify Snapshot
 			// Snapshot.setLonglinks(myPeerAddress, new
 			// HashSet<PeerAddress>(Arrays.asList(longlinks)));
@@ -432,7 +433,7 @@ public final class Peer extends ComponentDefinition {
 
 	private int numOfMyFriendlinks = 0;
 	
-	private void addFriendLink(PeerAddress peer, double friendSimilarityIndex) {
+	private void addFriendLink(PeerAddress peer, double friendSimilarityIndex, Set<BigInteger> otherSubscription) {
 		// to avoid self friend links
 		if (peer.equals(myPeerAddress))
 			return;
@@ -458,6 +459,8 @@ public final class Peer extends ComponentDefinition {
 		
 		// if I still have empty slot in friendlink, just adopt the peer without any checking
 		if (numOfMyFriendlinks < FRIENDLINK_SIZE) {
+			
+			otherSubscriptions.put(peer, otherSubscription);
 			linkSimilarityIndex[numOfMyFriendlinks] = friendSimilarityIndex;
 			
 			PeerAddress oldLink = longlinks[LONGLINK_SIZE + numOfMyFriendlinks];
@@ -495,6 +498,7 @@ public final class Peer extends ComponentDefinition {
 				resubscribe(set, oldLink);
 				
 				linkSimilarityIndex[index] = friendSimilarityIndex;
+				otherSubscriptions.put(peer, otherSubscription);
 				//System.out.println(longlinks[index + LONGLINK_SIZE]);
 				
 				// we decided to periodically refine one friend at a time so that we
@@ -684,7 +688,7 @@ public final class Peer extends ComponentDefinition {
 		}
 		
 		if (peerWithHighestSI != null) {
-			addFriendLink(peerWithHighestSI, highestSoFar);
+			addFriendLink(peerWithHighestSI, highestSoFar, randomNodes.get(peerWithHighestSI));
 		}
 	}
 
@@ -1199,7 +1203,7 @@ public final class Peer extends ComponentDefinition {
 				&& between(destination, pred.getPeerId(),
 						myPeerAddress.getPeerId())) {
 			// I am the rendezvous node
-		//	System.out.println("*** Peer " + myPeerAddress.getPeerId()
+			//	System.out.println("*** Peer " + myPeerAddress.getPeerId()
 			//		+ " is the rendezvous node for " + destination);
 			
 			if (msg instanceof SubscribeRequest) {
@@ -1222,6 +1226,8 @@ public final class Peer extends ComponentDefinition {
 		else {
 			// I am not the rendezvous node, route the message to the rendezvous
 			// node
+			
+			BigInteger meToRNode = computeDistance(myPeerAddress.getPeerId(), destination);
 
 			BigInteger nextHopID = null;
 			if (pred == null)
@@ -1235,21 +1241,12 @@ public final class Peer extends ComponentDefinition {
 				// " destination: " + destination);
 
 				nextHopID = succ.getPeerId();
-				// peerID < topic =: finger ------ dest
-				if (nextHopID.compareTo(destination) == -1
-						|| nextHopID.compareTo(destination) == 0) {
-					newDistance = destination.subtract(nextHopID);
-				}
-				// peerID > topic =: finger --- max --- dest
-				else {
-					newDistance = RING_SIZE.subtract(nextHopID);
-					newDistance = newDistance.add(destination);// destination.subtract(nextHopID).add(RING_SIZE);
-					// System.out.println("RING_SIZE: " + RING_SIZE + " xxx " +
-					// BigInteger.valueOf(Integer.MAX_VALUE).multiply(BigInteger.valueOf(2)));
-				}
+				newDistance = computeDistance(nextHopID, destination);
+				
 			} else
 				System.err.println("succ is null");
 
+			
 			// newDistance < oldDisntace
 			if (newDistance.compareTo(oldDistance) == -1) {
 				oldDistance = newDistance;
@@ -1261,6 +1258,7 @@ public final class Peer extends ComponentDefinition {
 			// note that the links are not necessarily stored in the ascending order of distance
 			// note that the finger links are stored in longlinks
 			// then, check in the fingers list
+			search_in_longlinks:
 			for (int i = 0; i < longlinks.length; i++) {
 
 				if (newDistance.equals(BigInteger.ZERO))
@@ -1274,22 +1272,30 @@ public final class Peer extends ComponentDefinition {
 
 					// peerID < topic =: finger ------ dest
 					nextHopID = longlinks[i].getPeerId();
-					if (nextHopID.compareTo(destination) == -1
-							|| nextHopID.compareTo(destination) == 0) {
-						newDistance = destination.subtract(nextHopID);
-					}
-					// peerID > topic =: finger --- max --- dest
-					else {
-						// newDistance =
-						// destination.subtract(fingers[i].getPeerId()).add(RING_SIZE);
-						newDistance = RING_SIZE.subtract(nextHopID);
-						newDistance = newDistance.add(destination);// destination.subtract(nextHopID).add(RING_SIZE);
+					newDistance = computeDistance(nextHopID, destination);
+					
+					// search longlinks based on SI
+					if (msg instanceof SubscribeRequest) {
+						SubscribeRequest sr = (SubscribeRequest) msg;
+						
+						Set<BigInteger> subscriptions = otherSubscriptions.get(longlinks[i]);
+						if ((newDistance.compareTo(meToRNode) == -1) 
+								&& (subscriptions != null)
+								&& subscriptions.contains(sr.getTopic())) {
+							
+							System.err.println("&&&&&&&");
+							oldDistance = newDistance;
+							address = longlinks[i].getPeerAddress();
+							nextPeer = longlinks[i].getPeerId();
+							break search_in_longlinks;
+						}
 					}
 				}
-
+					
 				// System.out.println("nextHopID: " + nextHopID + ", distance: "
 				// + newDistance);
 
+				// normal greedy routing
 				// newDistance < oldDisntace
 				if (newDistance.compareTo(oldDistance) == -1) {
 					// System.out.println("newDistance: " + newDistance +
@@ -1333,6 +1339,22 @@ public final class Peer extends ComponentDefinition {
 		else
 			System.err.println("Message is dropped.");
 
+	}
+	
+	private BigInteger computeDistance(BigInteger source, BigInteger destination) {
+		BigInteger distance;
+		// source < destination =: source ------ destination
+		if (source.compareTo(destination) == -1
+				|| source.compareTo(destination) == 0) {
+			distance = destination.subtract(source);
+		}
+		// source > destination =: source --- RING_SIZE --- destination
+		else {
+			distance = RING_SIZE.subtract(source);
+			distance = distance.add(destination);// destination.subtract(nextHopID).add(RING_SIZE);
+		}
+		
+		return distance;
 	}
 
 	// -------------------------------------------------------------------------
