@@ -1,0 +1,5 @@
+ant -f build.xml compile
+
+ant -f build.xml jar
+
+ant -f build.xml run

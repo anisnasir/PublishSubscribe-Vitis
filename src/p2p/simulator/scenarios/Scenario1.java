@@ -22,6 +22,7 @@ public class Scenario1 extends Scenario {
 	
 	
 	public static Properties configFile = new Properties();
+	public static int PEERS_PER_BLOCK;
 	
 	private static SimulationScenario scenario = new SimulationScenario() {{
 		
@@ -44,6 +45,8 @@ public class Scenario1 extends Scenario {
 		
 		NUMBER_OF_LONGLINKS = Integer.parseInt(configFile.getProperty("NumberOfLonglinks"));
 		NUMBER_OF_FRIENDLINKS =  Integer.parseInt(configFile.getProperty("NumberOfFriendlinks"));
+		
+		PEERS_PER_BLOCK = Integer.parseInt(configFile.getProperty("SubscriptionsPerNode"));
 		
 		StochasticProcess firstPeerStart = new StochasticProcess() {{
 			eventInterArrivalTime(constant(100));

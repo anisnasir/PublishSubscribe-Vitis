@@ -1450,6 +1450,10 @@ public final class Peer extends ComponentDefinition {
 			Iterator it = topicIDs.iterator();
 			while (it.hasNext()) {
 				BigInteger topicID = (BigInteger) it.next();
+				
+				mySubscriptions.put(topicID, BigInteger.ZERO);
+				Snapshot.setPeerSubscriptions(myPeerAddress, mySubscriptions.keySet());
+				
 				sendSubscribeRequest(topicID, BigInteger.ZERO);
 
 			}

@@ -226,16 +226,7 @@ public final class Simulator extends ComponentDefinition {
 	Handler<AllPeerSubscribe_C> handleAllPeerSubscribe_C = new Handler<AllPeerSubscribe_C>() {
 		public void handle(AllPeerSubscribe_C event) {
 			
-			Properties configFile = new Properties();
-			try {
-				configFile.load(this.getClass().getClassLoader().getResourceAsStream("simulation.properties"));
-			} catch (Exception e) {
-				System.err.println("Error: couldn't load the properties file in Scenario1.java");
-			}
-			
-			int peersPerBlock = Integer.parseInt(configFile.getProperty("SubscriptionsPerNode"));
-			
-			determineSubscription(true, peersPerBlock);
+			determineSubscription(true, Scenario1.PEERS_PER_BLOCK);
 		
 		}
 	};
